@@ -1,18 +1,122 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
+import { Button } from '@/components/Button';
+import { TextField } from '@/components/TextField';
 import { colors, spacing } from '@/constants/theme';
+import {
+  fetchFriends,
+  fetchIncomingRequests,
+  respondToRequest,
+  searchProfilesByHandle,
+  sendFriendRequest,
+} from '@/lib/api/friends';
+import type { FriendRequest, Profile } from '@/types';
 
 export default function AmisScreen() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Profile[]>([]);
+  const [requests, setRequests] = useState<FriendRequest[]>([]);
+  const [friends, setFriends] = useState<Profile[]>([]);
+
+  const loadAll = useCallback(() => {
+    fetchIncomingRequests().then(setRequests).catch(() => {});
+    fetchFriends().then(setFriends).catch(() => {});
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAll();
+    }, [loadAll])
+  );
+
+  const handleSearch = async () => {
+    try {
+      setResults(await searchProfilesByHandle(query));
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleAdd = async (userId: string) => {
+    try {
+      await sendFriendRequest(userId);
+      Alert.alert('Demande envoyée');
+      setResults((r) => r.filter((p) => p.id !== userId));
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message?.includes('ALREADY_FRIENDS') ? 'Déjà amis.' : e.message);
+    }
+  };
+
+  const handleRespond = async (id: string, accept: boolean) => {
+    await respondToRequest(id, accept);
+    loadAll();
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Amis</Text>
-      <Text style={styles.subtitle}>Recherche, demandes et liste d'amis arrivent ici (§7).</Text>
-    </View>
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}
+      ListHeaderComponent={
+        <View>
+          <Text style={styles.title}>Amis</Text>
+
+          <TextField placeholder="Chercher un @identifiant" value={query} onChangeText={setQuery} onSubmitEditing={handleSearch} autoCapitalize="none" />
+          <Button label="Chercher" onPress={handleSearch} variant="secondary" />
+
+          {results.length > 0 && (
+            <View style={{ marginTop: spacing.md }}>
+              {results.map((p) => (
+                <View key={p.id} style={styles.row}>
+                  <Text style={styles.name}>
+                    {p.display_name} <Text style={styles.handle}>@{p.handle}</Text>
+                  </Text>
+                  <Button label="Ajouter" onPress={() => handleAdd(p.id)} variant="secondary" />
+                </View>
+              ))}
+            </View>
+          )}
+
+          {requests.length > 0 && (
+            <View style={{ marginTop: spacing.xl }}>
+              <Text style={styles.sectionTitle}>Demandes reçues</Text>
+              {requests.map((r) => (
+                <View key={r.id} style={styles.row}>
+                  <Text style={styles.name}>{r.sender?.display_name}</Text>
+                  <View style={{ flexDirection: 'row' }}>
+                    <Button label="Accepter" onPress={() => handleRespond(r.id, true)} />
+                    <View style={{ width: spacing.sm }} />
+                    <Button label="Refuser" onPress={() => handleRespond(r.id, false)} variant="secondary" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>Mes amis</Text>
+        </View>
+      }
+      data={friends}
+      keyExtractor={(f) => f.id}
+      renderItem={({ item }) => (
+        <View style={styles.row}>
+          <Text style={styles.name}>
+            {item.display_name} <Text style={styles.handle}>@{item.handle}</Text>
+          </Text>
+        </View>
+      )}
+      ListEmptyComponent={<Text style={styles.subtitle}>Aucun ami pour l'instant.</Text>}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, justifyContent: 'center' },
-  title: { color: colors.text, fontSize: 28, fontWeight: '700', marginBottom: spacing.sm },
-  subtitle: { color: colors.textMuted, fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.background },
+  title: { color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: spacing.lg },
+  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
+  subtitle: { color: colors.textMuted, fontSize: 14 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  name: { color: colors.text, fontSize: 15 },
+  handle: { color: colors.textMuted },
 });
