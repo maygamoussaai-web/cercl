@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "CERCL",
+    "slug": "cercl",
+    "scheme": "cercl",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B10",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cercl.app"
+    },
+    "android": {
+      "package": "com.cercl.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B10"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
