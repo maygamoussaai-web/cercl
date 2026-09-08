@@ -7,17 +7,21 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "22.9.0",
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "node": "22.9.0",
       "android": {
         "buildType": "apk"
       }
     },
-    "production": {}
+    "production": {
+      "node": "22.9.0"
+    }
   },
   "submit": {
     "production": {}
