@@ -1,0 +1,34 @@
+name: EAS Build (Android preview)
+
+# Construit un vrai .apk installable dans le cloud Expo (EAS Build) à chaque push sur main.
+# Ne nécessite aucun ordinateur : tout tourne sur les serveurs GitHub + Expo.
+# Prérequis (une seule fois) : secret de dépôt GitHub "EXPO_TOKEN" (voir docs/BUILD_SANS_ORDINATEUR.md).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Expo + EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lancer le build Android (cloud EAS)
+        run: eas build --platform android --profile preview --non-interactive --no-wait

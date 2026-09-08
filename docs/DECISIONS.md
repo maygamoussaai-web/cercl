@@ -37,3 +37,14 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
 - **PROPOSITION** : identifiants d'app `com.cercl.app` (iOS `bundleIdentifier` / Android
   `package`) dans `app.json`. À remplacer par les vrais identifiants une fois les comptes
   développeur Apple Developer Program et Google Play Console créés.
+
+### 2026-09-08 — Environnement de développement sans ordinateur
+- **CONTRAINTE (contexte projet)** : le propriétaire du projet n'a pas d'ordinateur. Le
+  workflow standard Expo (`npx expo start` + Expo Go) nécessite un ordinateur faisant tourner
+  le serveur de développement et est donc écarté comme méthode principale.
+- **PROPOSITION** : utiliser EAS Build (service cloud Expo) pour construire un `.apk`
+  Android installable directement, déclenché automatiquement à chaque push via GitHub
+  Actions (`.github/workflows/eas-build-preview.yml`). Voir `docs/BUILD_SANS_ORDINATEUR.md`
+  pour la configuration (compte Expo + secret GitHub `EXPO_TOKEN`, à faire une seule fois).
+  Limite connue : ne couvre que l'installation Android pour l'instant ; iOS nécessitera un
+  compte Apple Developer et une distribution TestFlight, à traiter plus tard.
