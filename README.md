@@ -15,6 +15,11 @@ npx expo start
 
 Si `expo install --fix` change des versions dans `package.json`, c'est normal et attendu : les versions dans ce scaffold sont une base raisonnable, pas une vérité figée.
 
+## Builds Android
+
+Chaque push sur `main` déclenche automatiquement un build cloud (EAS Build) qui produit un
+`.apk` installable directement sur Android — voir `docs/BUILD_SANS_ORDINATEUR.md`.
+
 ## Stack
 
 - TypeScript strict
@@ -35,6 +40,7 @@ src/
 docs/
   ARCHITECTURE.md     → séparation Social Core / Game Platform
   DECISIONS.md        → journal des décisions (exigence / contrainte technique / proposition)
+  BUILD_SANS_ORDINATEUR.md → comment construire et installer l'app sans ordinateur
 assets/               → icônes et splash (pas encore fournies, voir assets/README.md)
 eas.json              → profils de build EAS (dev/preview/production)
 ```
