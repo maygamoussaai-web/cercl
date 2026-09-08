@@ -48,3 +48,39 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   pour la configuration (compte Expo + secret GitHub `EXPO_TOKEN`, à faire une seule fois).
   Limite connue : ne couvre que l'installation Android pour l'instant ; iOS nécessitera un
   compte Apple Developer et une distribution TestFlight, à traiter plus tard.
+
+### 2026-09-08 — Premier build EAS : erreur Node
+- **CONSTAT/CORRECTION** : le premier build a échoué (`@supabase/supabase-js` exige
+  Node ≥ 22, l'image de build utilisait Node 20). Corrigé en fixant `"node": "22.9.0"`
+  dans les 3 profils de `eas.json`.
+
+### 2026-09-08 — Schéma Supabase complet (Social Core + Game Platform)
+- **CONSTAT** : migrations `social_core` et `game_platform` appliquées sur le projet
+  Supabase. Tables, RLS, triggers et fonctions RPC créés — détail dans `docs/DATABASE.md`.
+- **CONTRAINTE TECHNIQUE (corrigée)** : les `GRANT EXECUTE` explicites sur les fonctions
+  RPC ne suffisent pas à eux seuls — Postgres accorde `EXECUTE` à `PUBLIC` par défaut sur
+  toute nouvelle fonction, ce qui aurait laissé `anon` (visiteurs non connectés) appeler
+  `create_circle`, `advance_turn`, etc. Corrigé par une migration dédiée
+  (`lock_down_function_execute_grants`) qui révoque l'accès par défaut puis ne l'accorde
+  qu'au strict nécessaire. Vérifié via `get_advisors` (aucune alerte de sécurité
+  inattendue restante).
+- **PROPOSITION** : `advance_turn` (cible + poseur, §24) est un premier jet fonctionnel
+  mais non testé en conditions réelles (concurrence, 2 joueurs, fin de cycle). À tester
+  avant de s'y fier pour une vraie partie.
+- **CONTRAINTE TECHNIQUE (à vérifier)** : Supabase Auth peut exiger une confirmation par
+  email avant de créer une session (comportement par défaut). Si `sign-up` ne connecte pas
+  automatiquement l'utilisateur, vérifier Authentication → Providers → Email dans le
+  dashboard Supabase et désactiver "Confirm email" pour les tests si besoin.
+
+### 2026-09-08 — App Social Core (auth, profils, Cercles, amis, invitations)
+- **CONSTAT** : implémentation de l'authentification (email/mot de passe), de l'onboarding
+  (choix nom + @identifiant), de la liste/création/détail des Cercles, du partage
+  d'invitation, de l'écran Amis (recherche, demandes, liste), des notifications (lecture
+  simple) et du profil (déconnexion). Le tout branché sur les vraies fonctions RPC/tables
+  Supabase, pas de données factices.
+- **PROPOSITION (report explicite, pas un oubli)** : l'écran de jeu lui-même (lobby,
+  bouteille, animations de tirage, choix Action/Vérité) n'est pas implémenté. Le bouton
+  "Lancer une partie" appelle bien `create_game` (donc la règle "1 partie active par
+  Cercle" est déjà testable), mais affiche une confirmation simple en attendant l'écran
+  dédié — cf. cahier des charges §43, priorités 4-6 traitées après le Social Core (priorité
+  1-2). Présence en ligne et chat (§13-15) également non implémentés à ce stade.
