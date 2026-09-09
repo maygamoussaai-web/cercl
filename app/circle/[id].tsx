@@ -1,16 +1,19 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, FlatList, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { colors, spacing } from '@/constants/theme';
 import { createCircleInvite, fetchCircle, fetchCircleMembers, launchGame } from '@/lib/api/circles';
-import type { Circle, CircleMember } from '@/types';
+import { fetchActiveGameForCircle } from '@/lib/api/game';
+import type { Circle, CircleMember, Game } from '@/types';
 
 export default function CircleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMember[]>([]);
+  const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -19,9 +22,10 @@ export default function CircleDetailScreen() {
     if (!id) return;
     setLoading(true);
     try {
-      const [c, m] = await Promise.all([fetchCircle(id), fetchCircleMembers(id)]);
+      const [c, m, g] = await Promise.all([fetchCircle(id), fetchCircleMembers(id), fetchActiveGameForCircle(id)]);
       setCircle(c);
       setMembers(m);
+      setActiveGame(g);
     } catch (e: any) {
       Alert.alert('Erreur', e.message);
     } finally {
@@ -50,13 +54,18 @@ export default function CircleDetailScreen() {
 
   const handleLaunch = async () => {
     if (!id) return;
+    if (activeGame) {
+      router.push(`/game/${activeGame.id}`);
+      return;
+    }
     setLaunching(true);
     try {
-      await launchGame(id);
-      Alert.alert('Partie lancée', "L'écran de jeu complet arrive dans une prochaine étape — tout le monde vient d'être notifié.");
+      const g = await launchGame(id);
+      router.push(`/game/${g.id}`);
     } catch (e: any) {
       if (e.message?.includes('GAME_ALREADY_ACTIVE')) {
-        Alert.alert('Partie déjà en cours', 'Une partie est déjà active dans ce Cercle.');
+        await load();
+        Alert.alert('Partie déjà en cours', "Quelqu'un vient de la lancer — tu peux la rejoindre.");
       } else {
         Alert.alert('Erreur', e.message);
       }
@@ -89,7 +98,7 @@ export default function CircleDetailScreen() {
 
       <Button label="Inviter des potes" onPress={handleInvite} loading={inviting} variant="secondary" />
       <View style={{ height: spacing.sm }} />
-      <Button label="Lancer une partie" onPress={handleLaunch} loading={launching} />
+      <Button label={activeGame ? 'Rejoindre la partie' : 'Lancer une partie'} onPress={handleLaunch} loading={launching} />
     </View>
   );
 }

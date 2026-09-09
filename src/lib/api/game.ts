@@ -1,0 +1,73 @@
+import { supabase } from '@/lib/supabase';
+import type { Game } from '@/types';
+
+export async function fetchActiveGameForCircle(circleId: string): Promise<Game | null> {
+  const { data, error } = await supabase
+    .from('games')
+    .select('*')
+    .eq('circle_id', circleId)
+    .in('status', ['lobby', 'in_progress'])
+    .maybeSingle();
+  if (error) throw error;
+  return data as Game | null;
+}
+
+export async function fetchGame(gameId: string): Promise<Game> {
+  const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
+  if (error) throw error;
+  return data as Game;
+}
+
+export async function fetchGamePlayers(gameId: string) {
+  const { data, error } = await supabase.from('game_players').select('*, profiles(*)').eq('game_id', gameId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function joinGame(gameId: string) {
+  const { error } = await supabase.rpc('join_game', { p_game_id: gameId });
+  if (error) throw error;
+}
+
+export async function advanceTurn(gameId: string) {
+  const { data, error } = await supabase.rpc('advance_turn', { p_game_id: gameId });
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchLatestTurn(gameId: string) {
+  const { data, error } = await supabase
+    .from('game_turns')
+    .select('*, game_content(text_content, type)')
+    .eq('game_id', gameId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as any;
+}
+
+export async function chooseTurnType(turnId: string, choice: 'action' | 'verite') {
+  const { data, error } = await supabase.rpc('choose_turn_type', { p_turn_id: turnId, p_choice: choice });
+  if (error) throw error;
+  return data;
+}
+
+export async function setCustomQuestion(turnId: string, question: string) {
+  const { data, error } = await supabase.rpc('set_turn_custom_question', { p_turn_id: turnId, p_question: question });
+  if (error) throw error;
+  return data;
+}
+
+export function subscribeToGame(gameId: string, onChange: () => void) {
+  const channel = supabase
+    .channel(`game-${gameId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turns', filter: `game_id=eq.${gameId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, onChange)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
