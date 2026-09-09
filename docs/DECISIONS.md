@@ -84,3 +84,32 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   Cercle" est déjà testable), mais affiche une confirmation simple en attendant l'écran
   dédié — cf. cahier des charges §43, priorités 4-6 traitées après le Social Core (priorité
   1-2). Présence en ligne et chat (§13-15) également non implémentés à ce stade.
+
+### 2026-09-09 — Correction du build EAS (vraie cause)
+- **CONSTAT/CORRECTION** : le build a continué d'échouer quasi instantanément malgré le
+  fix Node précédent — la vraie cause est que Supabase a **retiré le support de Node 20**
+  dans `@supabase/supabase-js` à partir de la version 2.110.0 (Node 20 atteint sa fin de
+  vie le 30/04/2026). Le `"node": "22.9.0"` fixé manuellement dans `eas.json` était par
+  ailleurs une version non vérifiée, potentiellement absente des images EAS.
+  Correction plus robuste : `@supabase/supabase-js` fixé exactement à `2.109.0` (dernière
+  version officiellement compatible Node 20, confirmé par le changelog Supabase), et
+  retrait de l'override `"node"` dans `eas.json` pour revenir à la version par défaut
+  d'EAS, plus prévisible.
+
+### 2026-09-09 — Écran de jeu Action ou Vérité (lobby, tours, choix)
+- **CONSTAT** : lobby (liste des joueurs, rejoindre, commencer), affichage cible/poseur,
+  choix Action/Vérité par la cible, révélation du contenu si la banque en a un, sinon
+  question personnalisée, bouton "Tour suivant". Synchronisé en temps réel entre joueurs
+  via Supabase Realtime (`games`, `game_turns`, `game_players` ajoutées à la publication
+  `supabase_realtime`, ce qui n'était pas fait par défaut). Le bouton "Lancer une
+  partie"/"Rejoindre la partie" dans le Cercle applique maintenant littéralement §18 :
+  désactivé/remplacé par l'accès à la partie active s'il y en a déjà une.
+- **AMBIGUÏTÉ DU CAHIER DES CHARGES SIGNALÉE (pas tranchée silencieusement)** : le §31
+  dit que c'est "le joueur ciblé" qui peut écrire une question personnalisée. C'est ce qui
+  est implémenté littéralement (la cible écrit sa propre question quand la banque n'a
+  rien). Mais on peut aussi lire ça comme visant le *poseur* (qui pose la question à la
+  cible) — l'interprétation inverse serait tout aussi défendable. À confirmer : qui doit
+  pouvoir écrire la question personnalisée ?
+- **CONSTAT** : la banque `game_content` étant vide, tous les tours passeront pour
+  l'instant par la question personnalisée — normal tant que la banque de 500+500
+  propositions n'est pas fournie (§19).
