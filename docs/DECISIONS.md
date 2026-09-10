@@ -113,3 +113,29 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
 - **CONSTAT** : la banque `game_content` étant vide, tous les tours passeront pour
   l'instant par la question personnalisée — normal tant que la banque de 500+500
   propositions n'est pas fournie (§19).
+
+### 2026-09-09 — Correction de la règle d'ordre des poseurs (alphabétique)
+- **CORRECTION (précision apportée par le propriétaire du projet)** : l'ordre utilisé pour
+  désigner le poseur suit l'ordre **alphabétique du @identifiant (nom d'utilisateur)**, pas
+  l'ordre d'arrivée dans le Cercle. `advance_turn` a été corrigé pour trier par
+  `profiles.handle` au lieu de `circle_members.order_index`. La colonne `order_index`
+  reste en base (inoffensive) mais n'est plus utilisée par la logique de jeu — elle
+  pourrait être supprimée dans un futur nettoyage si aucun autre usage n'apparaît.
+- Confirmation du fonctionnement déjà en place : poseur = n'a pas encore posé ce cycle,
+  n'est pas la cible du tour, et a le plus petit rang alphabétique parmi les joueurs
+  éligibles (§24). Cible = celui qui doit répondre, tiré aléatoirement côté serveur (§23).
+
+### 2026-09-09 — Amélioration app : chat, avatars, design
+- **CONSTAT** : ajout du chat de Cercle (conversation déjà créée à la création du Cercle)
+  et du chat privé (bouton "Message" sur chaque ami, via `get_or_create_direct_conversation`),
+  avec synchronisation temps réel (`messages` ajoutée à la publication `supabase_realtime`,
+  ne l'était pas). Ajout d'un composant `Avatar` (initiale + couleur dérivée du nom) utilisé
+  partout où un profil est affiché (Cercles, membres, amis, lobby, écran de jeu, profil).
+  Amélioration visuelle : cartes avec ombre légère, bouteille du jeu redessinée (silhouette
+  simple via des vues plutôt qu'un simple rectangle), rôles Cible/Poseur affichés côte à
+  côte avec avatar. Liste des membres du Cercle et des joueurs du lobby désormais triée
+  par ordre alphabétique, cohérent avec la vraie règle du jeu.
+- **PROPOSITION (report explicite)** : il ne s'agit pas encore de l'identité visuelle
+  définitive de CERCL (§3, à faire séparément) — c'est une amélioration de cohérence et de
+  lisibilité avec les mêmes couleurs placeholder. Une vraie passe design (typographie,
+  micro-animations, photos de profil réelles) reste à faire.
