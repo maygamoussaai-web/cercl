@@ -51,3 +51,13 @@ export async function fetchFriends(): Promise<Profile[]> {
   if (error) throw error;
   return (data ?? []).map((row: any) => (row.user_low === myId ? row.high : row.low));
 }
+
+export async function removeFriend(otherUserId: string) {
+  const { data: userData } = await supabase.auth.getUser();
+  const myId = userData.user?.id;
+  if (!myId) return;
+  const low = myId < otherUserId ? myId : otherUserId;
+  const high = myId < otherUserId ? otherUserId : myId;
+  const { error } = await supabase.from('friendships').delete().eq('user_low', low).eq('user_high', high);
+  if (error) throw error;
+}

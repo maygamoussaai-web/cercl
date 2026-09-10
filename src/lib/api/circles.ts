@@ -55,3 +55,13 @@ export async function launchGame(circleId: string, mode = 'chill') {
   if (error) throw error;
   return data;
 }
+
+export async function renameCircle(circleId: string, name: string) {
+  const { error } = await supabase.from('circles').update({ name }).eq('id', circleId);
+  if (error) throw error;
+}
+
+export async function removeCircleMember(circleId: string, userId: string) {
+  const { error } = await supabase.from('circle_members').delete().eq('circle_id', circleId).eq('user_id', userId);
+  if (error) throw error;
+}

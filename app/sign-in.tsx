@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -8,15 +8,24 @@ import { colors, spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function SignInScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const router = useRouter();
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSignIn = async () => {
+  const handleSendCode = async () => {
+    const cleaned = phone.trim();
+    if (!/^\+[1-9]\d{6,14}$/.test(cleaned)) {
+      Alert.alert('Numéro invalide', 'Utilise le format international, ex : +33612345678');
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase.auth.signInWithOtp({ phone: cleaned });
     setLoading(false);
-    if (error) Alert.alert('Connexion impossible', error.message);
+    if (error) {
+      Alert.alert('Erreur', error.message);
+      return;
+    }
+    router.push({ pathname: '/verify-otp', params: { phone: cleaned } });
   };
 
   return (
@@ -24,14 +33,16 @@ export default function SignInScreen() {
       <Text style={styles.title}>CERCL</Text>
       <Text style={styles.subtitle}>Retrouve tes potes.</Text>
 
-      <TextField label="Email" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-      <TextField label="Mot de passe" secureTextEntry value={password} onChangeText={setPassword} />
+      <TextField
+        label="Numéro de téléphone"
+        placeholder="+33612345678"
+        keyboardType="phone-pad"
+        autoCapitalize="none"
+        value={phone}
+        onChangeText={setPhone}
+      />
 
-      <Button label="Se connecter" onPress={handleSignIn} loading={loading} />
-
-      <Link href="/sign-up" style={styles.link}>
-        <Text style={styles.linkText}>Pas encore de compte ? Créer un compte</Text>
-      </Link>
+      <Button label="Recevoir le code" onPress={handleSendCode} loading={loading} />
     </KeyboardAvoidingView>
   );
 }
@@ -40,6 +51,4 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, justifyContent: 'center' },
   title: { color: colors.text, fontSize: 36, fontWeight: '800', marginBottom: spacing.xs },
   subtitle: { color: colors.textMuted, fontSize: 16, marginBottom: spacing.xl },
-  link: { marginTop: spacing.lg, alignSelf: 'center' },
-  linkText: { color: colors.accent, fontSize: 14 },
 });
