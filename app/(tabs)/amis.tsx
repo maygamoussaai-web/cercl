@@ -10,6 +10,7 @@ import { getOrCreateDirectConversation } from '@/lib/api/chat';
 import {
   fetchFriends,
   fetchIncomingRequests,
+  removeFriend,
   respondToRequest,
   searchProfilesByHandle,
   sendFriendRequest,
@@ -66,6 +67,24 @@ export default function AmisScreen() {
     }
   };
 
+  const handleRemove = (userId: string, name: string) => {
+    Alert.alert(`Retirer ${name} de tes amis ?`, undefined, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Retirer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeFriend(userId);
+            loadAll();
+          } catch (e: any) {
+            Alert.alert('Erreur', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <FlatList
       style={styles.container}
@@ -120,6 +139,9 @@ export default function AmisScreen() {
             {item.display_name} <Text style={styles.handle}>@{item.handle}</Text>
           </Text>
           <Button label="Message" onPress={() => handleMessage(item.id)} variant="secondary" />
+          <Text style={styles.removeLink} onPress={() => handleRemove(item.id, item.display_name)}>
+            Retirer
+          </Text>
         </View>
       )}
       ListEmptyComponent={<Text style={styles.subtitle}>Aucun ami pour l'instant.</Text>}
@@ -135,4 +157,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   name: { color: colors.text, fontSize: 15, flex: 1 },
   handle: { color: colors.textMuted },
+  removeLink: { color: colors.danger, fontSize: 12, marginLeft: spacing.xs },
 });

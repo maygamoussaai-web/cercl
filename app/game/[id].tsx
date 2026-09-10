@@ -66,6 +66,7 @@ export default function GameScreen() {
   const myId = session?.user.id;
   const isPlaying = players.some((p) => p.user_id === myId);
   const isTarget = turn && turn.target_id === myId;
+  const isPoser = turn && turn.poser_id === myId;
 
   const handleJoin = async () => {
     if (!id) return;
@@ -155,12 +156,12 @@ export default function GameScreen() {
           <View style={styles.rolesRow}>
             <View style={styles.roleBlock}>
               <Avatar name={targetPlayer?.profiles?.display_name ?? '?'} size={48} />
-              <Text style={styles.roleLabel}>Cible</Text>
+              <Text style={styles.roleLabel}>Cible (répond)</Text>
               <Text style={styles.roleName}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
             </View>
             <View style={styles.roleBlock}>
               <Avatar name={poserPlayer?.profiles?.display_name ?? '?'} size={48} />
-              <Text style={styles.roleLabel}>Pose la question</Text>
+              <Text style={styles.roleLabel}>Poseur (pose la question)</Text>
               <Text style={styles.roleName}>{poserPlayer?.profiles?.display_name ?? '…'}</Text>
             </View>
           </View>
@@ -173,12 +174,22 @@ export default function GameScreen() {
             </View>
           )}
 
-          {isTarget && turn.choice && !revealedText && (
+          {!turn.choice && !isTarget && (
+            <Text style={styles.hint}>En attente du choix Action/Vérité de {targetPlayer?.profiles?.display_name}…</Text>
+          )}
+
+          {isPoser && turn.choice && !revealedText && (
             <View style={{ marginTop: spacing.lg }}>
-              <Text style={styles.subtitle}>Pas de question dans la banque pour l'instant — écris la tienne :</Text>
+              <Text style={styles.subtitle}>
+                Pas de question dans la banque pour l'instant — écris-en une pour {targetPlayer?.profiles?.display_name} :
+              </Text>
               <TextField placeholder="Ta question" value={customText} onChangeText={setCustomText} multiline />
               <Button label="Valider" onPress={handleCustomSubmit} loading={busy} />
             </View>
+          )}
+
+          {!isPoser && turn.choice && !revealedText && (
+            <Text style={styles.hint}>En attente que {poserPlayer?.profiles?.display_name} écrive sa question…</Text>
           )}
 
           {revealedText && (
@@ -201,13 +212,13 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textMuted, fontSize: 14, marginBottom: spacing.sm },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   playerName: { color: colors.text, fontSize: 16 },
-  hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
+  hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' },
   bottleWrap: { alignItems: 'center', marginBottom: spacing.lg },
   bottleNeck: { width: 14, height: 22, backgroundColor: colors.accent, borderTopLeftRadius: 6, borderTopRightRadius: 6 },
   bottleBody: { width: 34, height: 78, backgroundColor: colors.accent, borderRadius: 14, marginTop: -2 },
   rolesRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.lg },
-  roleBlock: { alignItems: 'center' },
-  roleLabel: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
+  roleBlock: { alignItems: 'center', maxWidth: 140 },
+  roleLabel: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs, textAlign: 'center' },
   roleName: { color: colors.text, fontSize: 15, fontWeight: '700' },
   choiceRow: { flexDirection: 'row', marginTop: spacing.lg },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg },
