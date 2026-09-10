@@ -33,3 +33,22 @@ export const radius = {
   lg: 20,
   full: 999,
 } as const;
+
+export const fontSizes = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 20,
+  xl: 26,
+  xxl: 32,
+} as const;
+
+export const shadow = {
+  card: {
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+} as const;

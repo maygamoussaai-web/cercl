@@ -2,9 +2,11 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, FlatList, Share, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radius, shadow, spacing } from '@/constants/theme';
 import { createCircleInvite, fetchCircle, fetchCircleMembers, launchGame } from '@/lib/api/circles';
+import { getCircleConversationId } from '@/lib/api/chat';
 import { fetchActiveGameForCircle } from '@/lib/api/game';
 import type { Circle, CircleMember, Game } from '@/types';
 
@@ -23,8 +25,9 @@ export default function CircleDetailScreen() {
     setLoading(true);
     try {
       const [c, m, g] = await Promise.all([fetchCircle(id), fetchCircleMembers(id), fetchActiveGameForCircle(id)]);
+      const sorted = [...m].sort((a, b) => (a.profiles?.handle ?? '').localeCompare(b.profiles?.handle ?? ''));
       setCircle(c);
-      setMembers(m);
+      setMembers(sorted);
       setActiveGame(g);
     } catch (e: any) {
       Alert.alert('Erreur', e.message);
@@ -74,6 +77,16 @@ export default function CircleDetailScreen() {
     }
   };
 
+  const handleOpenChat = async () => {
+    if (!id) return;
+    try {
+      const conversationId = await getCircleConversationId(id);
+      if (conversationId) router.push(`/conversation/${conversationId}`);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
   if (loading || !circle) {
     return <View style={styles.container} />;
   }
@@ -81,7 +94,7 @@ export default function CircleDetailScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{circle.name}</Text>
-      <Text style={styles.subtitle}>{members.length}/10 membres</Text>
+      <Text style={styles.subtitle}>{members.length}/10 membres • ordre alphabétique</Text>
 
       <FlatList
         data={members}
@@ -89,13 +102,18 @@ export default function CircleDetailScreen() {
         style={{ marginVertical: spacing.lg }}
         renderItem={({ item }) => (
           <View style={styles.memberRow}>
-            <Text style={styles.memberName}>{item.profiles?.display_name ?? '…'}</Text>
-            <Text style={styles.memberHandle}>@{item.profiles?.handle}</Text>
+            <Avatar name={item.profiles?.display_name ?? '?'} size={36} />
+            <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+              <Text style={styles.memberName}>{item.profiles?.display_name ?? '…'}</Text>
+              <Text style={styles.memberHandle}>@{item.profiles?.handle}</Text>
+            </View>
           </View>
         )}
         ListEmptyComponent={<Text style={styles.subtitle}>Aucun membre pour l'instant.</Text>}
       />
 
+      <Button label="Discussion du Cercle" onPress={handleOpenChat} variant="secondary" />
+      <View style={{ height: spacing.sm }} />
       <Button label="Inviter des potes" onPress={handleInvite} loading={inviting} variant="secondary" />
       <View style={{ height: spacing.sm }} />
       <Button label={activeGame ? 'Rejoindre la partie' : 'Lancer une partie'} onPress={handleLaunch} loading={launching} />
@@ -109,7 +127,7 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   memberRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

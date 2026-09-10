@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
 import { colors, spacing } from '@/constants/theme';
+import { getOrCreateDirectConversation } from '@/lib/api/chat';
 import {
   fetchFriends,
   fetchIncomingRequests,
@@ -15,6 +17,7 @@ import {
 import type { FriendRequest, Profile } from '@/types';
 
 export default function AmisScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Profile[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -54,6 +57,15 @@ export default function AmisScreen() {
     loadAll();
   };
 
+  const handleMessage = async (userId: string) => {
+    try {
+      const conversationId = await getOrCreateDirectConversation(userId);
+      router.push(`/conversation/${conversationId}`);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
   return (
     <FlatList
       style={styles.container}
@@ -69,6 +81,7 @@ export default function AmisScreen() {
             <View style={{ marginTop: spacing.md }}>
               {results.map((p) => (
                 <View key={p.id} style={styles.row}>
+                  <Avatar name={p.display_name} size={36} />
                   <Text style={styles.name}>
                     {p.display_name} <Text style={styles.handle}>@{p.handle}</Text>
                   </Text>
@@ -83,6 +96,7 @@ export default function AmisScreen() {
               <Text style={styles.sectionTitle}>Demandes reçues</Text>
               {requests.map((r) => (
                 <View key={r.id} style={styles.row}>
+                  <Avatar name={r.sender?.display_name ?? '?'} size={36} />
                   <Text style={styles.name}>{r.sender?.display_name}</Text>
                   <View style={{ flexDirection: 'row' }}>
                     <Button label="Accepter" onPress={() => handleRespond(r.id, true)} />
@@ -101,9 +115,11 @@ export default function AmisScreen() {
       keyExtractor={(f) => f.id}
       renderItem={({ item }) => (
         <View style={styles.row}>
+          <Avatar name={item.display_name} size={36} />
           <Text style={styles.name}>
             {item.display_name} <Text style={styles.handle}>@{item.handle}</Text>
           </Text>
+          <Button label="Message" onPress={() => handleMessage(item.id)} variant="secondary" />
         </View>
       )}
       ListEmptyComponent={<Text style={styles.subtitle}>Aucun ami pour l'instant.</Text>}
@@ -116,7 +132,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: spacing.lg },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
   subtitle: { color: colors.textMuted, fontSize: 14 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  name: { color: colors.text, fontSize: 15 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  name: { color: colors.text, fontSize: 15, flex: 1 },
   handle: { color: colors.textMuted },
 });

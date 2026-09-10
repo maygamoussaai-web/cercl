@@ -1,7 +1,8 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { colors, radius, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 
 export default function ProfilScreen() {
@@ -9,7 +10,7 @@ export default function ProfilScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.avatar} />
+      <Avatar name={profile?.display_name ?? '?'} size={88} />
       <Text style={styles.name}>{profile?.display_name ?? '…'}</Text>
       <Text style={styles.handle}>@{profile?.handle}</Text>
 
@@ -30,7 +31,6 @@ export default function ProfilScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, alignItems: 'center', justifyContent: 'center' },
-  avatar: { width: 88, height: 88, borderRadius: radius.full, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
-  name: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  name: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: spacing.lg },
   handle: { color: colors.textMuted, fontSize: 15, marginTop: spacing.xs },
 });
