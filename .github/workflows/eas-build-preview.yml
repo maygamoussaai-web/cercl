@@ -21,13 +21,15 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup EAS
-        run: npm install --global eas-cli@latest
+      - name: Setup Expo + EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
         run: npm install
 
       - name: Lancer le build Android (cloud EAS)
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas build --platform android --profile preview --non-interactive --no-wait
