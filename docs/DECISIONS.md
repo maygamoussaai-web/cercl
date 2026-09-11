@@ -171,3 +171,23 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   Cercle (bouton "Quitter" masqué pour lui). Pas de blocage/signalement (modération, §21,
   distinct de "retirer un ami"). Build EAS et banque de contenu volontairement laissés de
   côté à la demande du propriétaire du projet, à traiter dans une étape suivante.
+
+### 2026-09-11 — Capacités du créateur complétées + bouteille animée
+- **CONSTAT** : le créateur peut maintenant ajouter un membre directement depuis ses amis
+  (`add-member/[id]`, sans passer par une invitation — la policy RLS le permettait déjà,
+  seule l'interface manquait) et gérer ses invitations (`manage-invites/[id]` : liste avec
+  statut Active/Expirée/Utilisée, révocation d'une invitation active). Complète le §9 du
+  cahier des charges ("ajouter des membres" et "gérer les invitations" étaient jusque-là
+  couverts uniquement par le lien de partage).
+- **CONSTAT — bouteille animée (§23, §30)** : l'écran de jeu affiche maintenant les
+  joueurs disposés en cercle avec la bouteille au centre. Quand un nouveau tour est créé,
+  la bouteille tourne plusieurs fois (animation ~2,6s, décélération progressive) puis
+  s'arrête pile sur l'avatar de la cible réellement tirée côté serveur (`advance_turn`) —
+  la cible n'est jamais recalculée côté client, l'animation ne fait qu'illustrer un
+  résultat déjà déterminé par le serveur, conformément à l'exigence du §23. Un tour déjà
+  ancien (réouverture de l'écran plus tard) place la bouteille directement sans rejouer
+  l'animation, pour ne pas donner l'impression d'un nouveau tirage.
+- **PROPOSITION** : la distinction "tour frais vs déjà connu" utilise une heuristique
+  (moins de 8 secondes depuis la création du tour) plutôt qu'un état explicite, par
+  simplicité. Fonctionne dans les cas normaux ; à surveiller si des écarts d'horloge ou une
+  latence réseau importante causent un faux positif/négatif.
