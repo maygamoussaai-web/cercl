@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type PropsWithChildren 
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { registerForPushNotifications } from '@/lib/api/push';
 import type { Profile } from '@/types';
 
 type AuthContextValue = {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setSession(data.session);
       if (data.session) {
         await loadProfile(data.session.user.id);
+        registerForPushNotifications().catch(() => {});
       }
       setLoading(false);
     });
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setSession(newSession);
       if (newSession) {
         await loadProfile(newSession.user.id);
+        registerForPushNotifications().catch(() => {});
       } else {
         setProfile(null);
       }

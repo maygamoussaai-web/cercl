@@ -61,13 +61,24 @@ export async function renameCircle(circleId: string, name: string) {
   if (error) throw error;
 }
 
+export async function updateCircleImage(circleId: string, imageUrl: string) {
+  const { error } = await supabase.from('circles').update({ image_url: imageUrl }).eq('id', circleId);
+  if (error) throw error;
+}
+
+export async function transferCircleOwnership(circleId: string, newOwnerId: string) {
+  const { error } = await supabase.rpc('transfer_circle_ownership', {
+    p_circle_id: circleId,
+    p_new_owner_id: newOwnerId,
+  });
+  if (error) throw error;
+}
+
 export async function removeCircleMember(circleId: string, userId: string) {
   const { error } = await supabase.from('circle_members').delete().eq('circle_id', circleId).eq('user_id', userId);
   if (error) throw error;
 }
 
-// Ajout direct d'un membre par le créateur (§9 : "ajouter des membres"), sans
-// passer par une invitation. Autorisé par la policy RLS circle_members_insert_by_creator.
 export async function addMemberDirect(circleId: string, userId: string) {
   const { error } = await supabase.from('circle_members').insert({ circle_id: circleId, user_id: userId });
   if (error) throw error;

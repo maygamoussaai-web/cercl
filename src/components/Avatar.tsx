@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius } from '@/constants/theme';
 
@@ -10,21 +10,24 @@ function colorForName(name: string) {
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
-type Props = { name: string; size?: number; online?: boolean };
+type Props = { name: string; size?: number; online?: boolean; uri?: string | null };
 
-// Avatar temporaire (initiale + couleur dérivée du nom) tant qu'il n'y a pas de vraies
-// photos de profil (à remplacer par la vraie image dès que l'upload sera implémenté).
-// Le point vert optionnel indique la présence en ligne (§13 du cahier des charges).
-export function Avatar({ name, size = 40, online }: Props) {
+// Avatar : affiche la vraie photo (uri) si disponible, sinon une initiale + couleur
+// dérivée du nom. Le point vert optionnel indique la présence en ligne (§13).
+export function Avatar({ name, size = 40, online, uri }: Props) {
   const safeName = name?.trim() || '?';
   const initial = safeName[0]?.toUpperCase() ?? '?';
   const bg = colorForName(safeName);
   const dotSize = Math.max(10, size * 0.28);
   return (
     <View style={{ width: size, height: size }}>
-      <View style={[styles.container, { width: size, height: size, borderRadius: radius.full, backgroundColor: bg }]}>
-        <Text style={[styles.text, { fontSize: size * 0.42 }]}>{initial}</Text>
-      </View>
+      {uri ? (
+        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: radius.full }} />
+      ) : (
+        <View style={[styles.container, { width: size, height: size, borderRadius: radius.full, backgroundColor: bg }]}>
+          <Text style={[styles.text, { fontSize: size * 0.42 }]}>{initial}</Text>
+        </View>
+      )}
       {online !== undefined && (
         <View
           style={[

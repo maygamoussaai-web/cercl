@@ -61,3 +61,22 @@ export async function removeFriend(otherUserId: string) {
   const { error } = await supabase.from('friendships').delete().eq('user_low', low).eq('user_high', high);
   if (error) throw error;
 }
+
+export async function blockUser(userId: string) {
+  const { error } = await supabase.rpc('block_user', { p_user_id: userId });
+  if (error) throw error;
+}
+
+export async function unblockUser(userId: string) {
+  const { error } = await supabase.rpc('unblock_user', { p_user_id: userId });
+  if (error) throw error;
+}
+
+export async function fetchBlockedUsers(): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('blocked_users')
+    .select('profiles:profiles!blocked_users_blocked_id_fkey(*)')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.profiles).filter(Boolean);
+}
