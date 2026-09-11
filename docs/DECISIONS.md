@@ -139,3 +139,35 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   définitive de CERCL (§3, à faire séparément) — c'est une amélioration de cohérence et de
   lisibilité avec les mêmes couleurs placeholder. Une vraie passe design (typographie,
   micro-animations, photos de profil réelles) reste à faire.
+
+### 2026-09-11 — Authentification par téléphone + Social Core complété
+- **EXIGENCE (décision du propriétaire du projet, remplace l'auth email précédente)** :
+  authentification par numéro de téléphone + code de vérification SMS. Implémenté :
+  `sign-in` (saisie du numéro, format international) → `verify-otp` (saisie du code) via
+  `supabase.auth.signInWithOtp` / `verifyOtp`. L'ancien écran `sign-up` (email/mot de
+  passe) a été supprimé : avec le téléphone, une seule fonction gère à la fois inscription
+  et connexion.
+- **CONTRAINTE TECHNIQUE (bloquante, pas encore levée)** : Supabase n'envoie pas de SMS
+  lui-même. Il faut configurer un fournisseur tiers (Twilio recommandé, ou Vonage/
+  MessageBird) dans le dashboard Supabase (Authentication → Providers → Phone), avec un
+  compte et des identifiants propres au propriétaire du projet — je ne peux pas le faire
+  depuis ici. Tant que ce n'est pas fait, "Recevoir le code" échouera. Étapes détaillées :
+  `docs/AUTH_PHONE_SETUP.md`.
+- **CORRECTION (précision du propriétaire du projet)** : c'est le **poseur**, pas la
+  cible, qui écrit la question personnalisée quand la banque est vide (§31). Corrige la
+  décision du 2026-09-09 qui avait implémenté l'inverse par lecture littérale ambiguë du
+  texte — l'ambiguïté est maintenant tranchée.
+- **CONSTAT — Social Core complété** :
+  - Présence en ligne par Cercle (Supabase Realtime Presence, point vert sur l'avatar),
+    sans écriture en base par utilisateur/seconde (§6 des directives complémentaires).
+  - Réglages de Cercle : renommer (créateur uniquement), quitter le Cercle (non-créateur),
+    retirer un membre (créateur uniquement) — ces règles existaient déjà en RLS, seule
+    l'interface manquait.
+  - Retirer un ami (suppression de la relation d'amitié).
+  - Les notifications mènent maintenant à l'écran concerné au clic (partie lancée → écran
+    de jeu, demande d'ami → onglet Amis, sinon → Cercle concerné), conformément au §33.
+- **LIMITE CONNUE (non traitée, hors périmètre demandé pour cette étape)** : pas de
+  transfert de propriété d'un Cercle — un créateur ne peut pas encore quitter son propre
+  Cercle (bouton "Quitter" masqué pour lui). Pas de blocage/signalement (modération, §21,
+  distinct de "retirer un ami"). Build EAS et banque de contenu volontairement laissés de
+  côté à la demande du propriétaire du projet, à traiter dans une étape suivante.
