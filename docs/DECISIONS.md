@@ -191,3 +191,40 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   (moins de 8 secondes depuis la création du tour) plutôt qu'un état explicite, par
   simplicité. Fonctionne dans les cas normaux ; à surveiller si des écarts d'horloge ou une
   latence réseau importante causent un faux positif/négatif.
+
+### 2026-09-11 — Compléments Social Core : photos, blocage, transfert, chat avancé, push
+- **CONSTAT — Stockage (Supabase Storage)** : 3 buckets créés — `avatars` (public),
+  `circle-images` (public), `chat-media` (privé, accès restreint aux membres de la
+  conversation via RLS sur `storage.objects`). Upload réel de photo de profil et d'image
+  de Cercle (créateur uniquement), avec `expo-image-picker`.
+- **CONSTAT — Blocage (§21)** : table `blocked_users` + RPC `block_user`/`unblock_user`.
+  Bloquer quelqu'un supprime l'amitié existante, décline les demandes en attente, et
+  empêche désormais l'envoi de nouvelles demandes d'ami et de messages directs entre les
+  deux comptes (triggers dédiés). Écran "Utilisateurs bloqués" pour débloquer. Distinct de
+  "retirer un ami" (qui n'empêche pas de redevenir amis plus tard).
+- **CONSTAT — Transfert de propriété de Cercle** : RPC `transfer_circle_ownership`
+  (créateur uniquement, vers un membre existant). Lève la limite connue du 2026-09-11 :
+  un créateur peut maintenant transférer puis quitter son Cercle.
+- **CONSTAT — Chat avancé** : suppression de ses propres messages (policy RLS +
+  synchronisée en temps réel pour tout le monde), envoi de photos (bucket `chat-media`,
+  URL signée résolue à l'affichage plutôt que stockée en clair pour ne pas expirer en
+  base), indicateur "Quelqu'un écrit…" via un canal Realtime broadcast (aucune écriture en
+  base, léger).
+- **CONSTAT — Nettoyage automatique des messages (§16)** : `pg_cron` activé, tâche
+  quotidienne (3h) qui supprime les messages de plus de 30 jours.
+- **CONSTAT — Notifications push** : `pg_net` activé ; un trigger sur `notifications`
+  appelle directement l'API push d'Expo (pas d'Edge Function nécessaire) si le
+  destinataire a un token enregistré. Le token est enregistré côté app via
+  `expo-notifications`/`expo-device` à la connexion (best-effort, silencieux si ça
+  échoue). Nécessite un vrai appareil (ne fonctionne pas sur émulateur) et un build EAS
+  (pas Expo Go) pour être testé.
+- **CONTRAINTE TECHNIQUE (limite acceptée)** : l'audit de sécurité signale que `pg_net`
+  s'installe dans le schéma `public` par défaut ; Postgres refuse de le déplacer
+  (`cannot move extension "pg_net" into schema "net" because the extension contains the
+  schema`). C'est une limitation connue de cette extension chez Supabase, sans solution
+  simple — accepté tel quel, sévérité faible.
+- **NON FAIT (bloqué par une dépendance externe hors de portée ici, pas un oubli)** : vrais
+  liens web `cercl.app/join/xxx` cliquables depuis l'extérieur de l'app (universal links /
+  app links). Nécessite un nom de domaine réellement possédé, une page hébergée, et les
+  identifiants Apple Team ID / Google — tout ce que le propriétaire du projet a
+  explicitement mis de côté pour plus tard (build, identifiants d'app, banque de contenu).
