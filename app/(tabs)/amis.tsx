@@ -8,6 +8,7 @@ import { TextField } from '@/components/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { getOrCreateDirectConversation } from '@/lib/api/chat';
 import {
+  blockUser,
   fetchFriends,
   fetchIncomingRequests,
   removeFriend,
@@ -85,13 +86,37 @@ export default function AmisScreen() {
     ]);
   };
 
+  const handleBlock = (userId: string, name: string) => {
+    Alert.alert(`Bloquer ${name} ?`, "Vous ne pourrez plus vous envoyer de demandes ni de messages.", [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Bloquer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(userId);
+            loadAll();
+            setResults((r) => r.filter((p) => p.id !== userId));
+          } catch (e: any) {
+            Alert.alert('Erreur', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <FlatList
       style={styles.container}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}
       ListHeaderComponent={
         <View>
-          <Text style={styles.title}>Amis</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Amis</Text>
+            <Text style={styles.blockedLink} onPress={() => router.push('/blocked-users')}>
+              Bloqués
+            </Text>
+          </View>
 
           <TextField placeholder="Chercher un @identifiant" value={query} onChangeText={setQuery} onSubmitEditing={handleSearch} autoCapitalize="none" />
           <Button label="Chercher" onPress={handleSearch} variant="secondary" />
@@ -100,7 +125,7 @@ export default function AmisScreen() {
             <View style={{ marginTop: spacing.md }}>
               {results.map((p) => (
                 <View key={p.id} style={styles.row}>
-                  <Avatar name={p.display_name} size={36} />
+                  <Avatar name={p.display_name} size={36} uri={p.avatar_url} />
                   <Text style={styles.name}>
                     {p.display_name} <Text style={styles.handle}>@{p.handle}</Text>
                   </Text>
@@ -115,7 +140,7 @@ export default function AmisScreen() {
               <Text style={styles.sectionTitle}>Demandes reçues</Text>
               {requests.map((r) => (
                 <View key={r.id} style={styles.row}>
-                  <Avatar name={r.sender?.display_name ?? '?'} size={36} />
+                  <Avatar name={r.sender?.display_name ?? '?'} size={36} uri={r.sender?.avatar_url} />
                   <Text style={styles.name}>{r.sender?.display_name}</Text>
                   <View style={{ flexDirection: 'row' }}>
                     <Button label="Accepter" onPress={() => handleRespond(r.id, true)} />
@@ -134,13 +159,16 @@ export default function AmisScreen() {
       keyExtractor={(f) => f.id}
       renderItem={({ item }) => (
         <View style={styles.row}>
-          <Avatar name={item.display_name} size={36} />
+          <Avatar name={item.display_name} size={36} uri={item.avatar_url} />
           <Text style={styles.name}>
             {item.display_name} <Text style={styles.handle}>@{item.handle}</Text>
           </Text>
           <Button label="Message" onPress={() => handleMessage(item.id)} variant="secondary" />
           <Text style={styles.removeLink} onPress={() => handleRemove(item.id, item.display_name)}>
             Retirer
+          </Text>
+          <Text style={styles.blockLink} onPress={() => handleBlock(item.id, item.display_name)}>
+            Bloquer
           </Text>
         </View>
       )}
@@ -151,11 +179,14 @@ export default function AmisScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  title: { color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: spacing.lg },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  title: { color: colors.text, fontSize: 28, fontWeight: '800' },
+  blockedLink: { color: colors.textMuted, fontSize: 13 },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
   subtitle: { color: colors.textMuted, fontSize: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   name: { color: colors.text, fontSize: 15, flex: 1 },
   handle: { color: colors.textMuted },
   removeLink: { color: colors.danger, fontSize: 12, marginLeft: spacing.xs },
+  blockLink: { color: colors.textMuted, fontSize: 12, marginLeft: spacing.xs },
 });

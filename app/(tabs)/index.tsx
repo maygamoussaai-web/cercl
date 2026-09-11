@@ -40,7 +40,7 @@ export default function CerclesScreen() {
         contentContainerStyle={{ paddingBottom: spacing.xl }}
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => router.push(`/circle/${item.id}`)}>
-            <Avatar name={item.name} size={40} />
+            <Avatar name={item.name} size={40} uri={item.image_url} />
             <Text style={styles.cardTitle}>{item.name}</Text>
           </Pressable>
         )}
