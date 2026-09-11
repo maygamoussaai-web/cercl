@@ -13,33 +13,22 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.cercl.app",
-      "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "CERCL a besoin d'accéder à tes photos pour changer ta photo de profil ou l'image d'un Cercle."
-      }
+      "bundleIdentifier": "com.cercl.app"
     },
     "android": {
       "package": "com.cercl.app",
       "adaptiveIcon": {
         "backgroundColor": "#0B0B10"
-      },
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "NOTIFICATIONS"
-      ]
+      }
     },
     "plugins": [
       "expo-router",
       [
-        "expo-image-picker",
+        "expo-build-properties",
         {
-          "photosPermission": "CERCL a besoin d'accéder à tes photos pour changer ta photo de profil ou l'image d'un Cercle."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "color": "#7C5CFC"
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
         }
       ]
     ],
