@@ -72,9 +72,6 @@ export default function GameScreen() {
     return subscribeToGame(id, load);
   }, [id, load]);
 
-  // Anime la bouteille uniquement pour un tour "frais" (créé il y a moins de 8s).
-  // Un tour plus ancien (réouverture de l'écran) place la bouteille directement
-  // sans animation, pour ne pas rejouer un tirage déjà connu.
   useEffect(() => {
     if (!turn || !turn.target_id || players.length < 2) return;
     if (animatedTurnId.current === turn.id) return;
@@ -190,7 +187,7 @@ export default function GameScreen() {
           <Text style={styles.subtitle}>{players.length} joueur(s) dans le lobby</Text>
           {players.map((p) => (
             <View key={p.user_id} style={styles.playerRow}>
-              <Avatar name={p.profiles?.display_name ?? '?'} size={32} />
+              <Avatar name={p.profiles?.display_name ?? '?'} size={32} uri={p.profiles?.avatar_url} />
               <Text style={styles.playerName}>{p.profiles?.display_name}</Text>
             </View>
           ))}
@@ -212,7 +209,7 @@ export default function GameScreen() {
               return (
                 <View key={p.user_id} style={[styles.wheelSlot, pos]}>
                   <View style={[styles.avatarRing, isPoserAvatar && styles.ringPoser, isRevealedTarget && styles.ringTarget]}>
-                    <Avatar name={p.profiles?.display_name ?? '?'} size={AVATAR_SIZE} />
+                    <Avatar name={p.profiles?.display_name ?? '?'} size={AVATAR_SIZE} uri={p.profiles?.avatar_url} />
                   </View>
                 </View>
               );

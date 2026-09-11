@@ -15,8 +15,11 @@ import {
   launchGame,
   removeCircleMember,
   renameCircle,
+  transferCircleOwnership,
+  updateCircleImage,
 } from '@/lib/api/circles';
 import { fetchActiveGameForCircle } from '@/lib/api/game';
+import { pickImage, uploadPublicImage } from '@/lib/api/media';
 import { useCirclePresence } from '@/lib/api/presence';
 import type { Circle, CircleMember, Game } from '@/types';
 
@@ -32,6 +35,8 @@ export default function CircleDetailScreen() {
   const [launching, setLaunching] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [transferring, setTransferring] = useState(false);
 
   const myId = session?.user.id;
   const online = useCirclePresence(id, myId);
@@ -121,6 +126,22 @@ export default function CircleDetailScreen() {
     }
   };
 
+  const handleChangeImage = async () => {
+    if (!id) return;
+    const uri = await pickImage(true);
+    if (!uri) return;
+    setUploadingImage(true);
+    try {
+      const url = await uploadPublicImage('circle-images', `${id}/image.jpg`, uri);
+      await updateCircleImage(id, url);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleLeave = () => {
     if (!id || !myId) return;
     Alert.alert('Quitter ce Cercle ?', undefined, [
@@ -159,32 +180,62 @@ export default function CircleDetailScreen() {
     ]);
   };
 
+  const handleTransfer = (userId: string, name: string) => {
+    if (!id) return;
+    Alert.alert(`Faire de ${name} le nouveau créateur ?`, "Tu ne pourras plus gérer ce Cercle ensuite (sauf s'il te le retransfère).", [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Transférer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await transferCircleOwnership(id, userId);
+            setTransferring(false);
+            await load();
+          } catch (e: any) {
+            Alert.alert('Erreur', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading || !circle) {
     return <View style={styles.container} />;
   }
 
   return (
     <View style={styles.container}>
-      {renaming ? (
-        <View style={{ marginTop: spacing.lg }}>
-          <TextField value={newName} onChangeText={setNewName} placeholder="Nom du Cercle" />
-          <View style={{ flexDirection: 'row' }}>
-            <Button label="Enregistrer" onPress={handleSaveRename} />
-            <View style={{ width: spacing.sm }} />
-            <Button label="Annuler" onPress={() => setRenaming(false)} variant="secondary" />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{circle.name}</Text>
-          {isCreator && (
-            <Text style={styles.editLink} onPress={handleStartRename}>
-              Renommer
-            </Text>
+      <View style={styles.headerRow}>
+        <Avatar name={circle.name} size={64} uri={circle.image_url} />
+        <View style={{ flex: 1, marginLeft: spacing.md }}>
+          {renaming ? (
+            <View>
+              <TextField value={newName} onChangeText={setNewName} placeholder="Nom du Cercle" />
+              <View style={{ flexDirection: 'row' }}>
+                <Button label="Enregistrer" onPress={handleSaveRename} />
+                <View style={{ width: spacing.sm }} />
+                <Button label="Annuler" onPress={() => setRenaming(false)} variant="secondary" />
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.title}>{circle.name}</Text>
+              {isCreator && (
+                <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                  <Text style={styles.editLink} onPress={handleStartRename}>
+                    Renommer
+                  </Text>
+                  <Text style={styles.editLink} onPress={handleChangeImage}>
+                    {uploadingImage ? 'Envoi…' : 'Changer la photo'}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
+          <Text style={styles.subtitle}>{members.length}/10 membres • ordre alphabétique</Text>
         </View>
-      )}
-      <Text style={styles.subtitle}>{members.length}/10 membres • ordre alphabétique</Text>
+      </View>
 
       <FlatList
         data={members}
@@ -192,17 +243,27 @@ export default function CircleDetailScreen() {
         style={{ marginVertical: spacing.lg }}
         renderItem={({ item }) => (
           <View style={styles.memberRow}>
-            <Avatar name={item.profiles?.display_name ?? '?'} size={36} online={online.has(item.user_id)} />
+            <Avatar
+              name={item.profiles?.display_name ?? '?'}
+              size={36}
+              online={online.has(item.user_id)}
+              uri={item.profiles?.avatar_url}
+            />
             <View style={{ marginLeft: spacing.sm, flex: 1 }}>
               <Text style={styles.memberName}>{item.profiles?.display_name ?? '…'}</Text>
               <Text style={styles.memberHandle}>@{item.profiles?.handle}</Text>
             </View>
-            {isCreator && item.user_id !== myId && (
+            {isCreator && item.user_id !== myId && !transferring && (
               <Text
                 style={styles.removeLink}
                 onPress={() => handleRemoveMember(item.user_id, item.profiles?.display_name ?? 'ce membre')}
               >
                 Retirer
+              </Text>
+            )}
+            {isCreator && item.user_id !== myId && transferring && (
+              <Text style={styles.transferLink} onPress={() => handleTransfer(item.user_id, item.profiles?.display_name ?? 'ce membre')}>
+                Transférer ici
               </Text>
             )}
           </View>
@@ -215,6 +276,12 @@ export default function CircleDetailScreen() {
           <Button label="Ajouter un membre" onPress={() => router.push(`/add-member/${id}`)} variant="secondary" />
           <View style={{ height: spacing.sm }} />
           <Button label="Gérer les invitations" onPress={() => router.push(`/manage-invites/${id}`)} variant="secondary" />
+          <View style={{ height: spacing.sm }} />
+          <Button
+            label={transferring ? 'Annuler le transfert' : 'Transférer la propriété'}
+            onPress={() => setTransferring((t) => !t)}
+            variant="secondary"
+          />
           <View style={{ height: spacing.sm }} />
         </>
       )}
@@ -236,9 +303,9 @@ export default function CircleDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-  title: { color: colors.text, fontSize: 28, fontWeight: '800' },
-  editLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.lg },
+  title: { color: colors.text, fontSize: 24, fontWeight: '800' },
+  editLink: { color: colors.accent, fontSize: 13, fontWeight: '600', marginTop: spacing.xs },
   subtitle: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   memberRow: {
     flexDirection: 'row',
@@ -250,4 +317,5 @@ const styles = StyleSheet.create({
   memberName: { color: colors.text, fontSize: 16, fontWeight: '600' },
   memberHandle: { color: colors.textMuted, fontSize: 14 },
   removeLink: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  transferLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
 });
