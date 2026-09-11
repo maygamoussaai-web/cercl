@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
@@ -19,13 +19,17 @@ import {
 } from '@/lib/api/game';
 import type { Game } from '@/types';
 
-function Bottle() {
-  return (
-    <View style={styles.bottleWrap}>
-      <View style={styles.bottleNeck} />
-      <View style={styles.bottleBody} />
-    </View>
-  );
+const WHEEL_SIZE = 260;
+const WHEEL_RADIUS = 96;
+const CENTER = WHEEL_SIZE / 2;
+const AVATAR_SIZE = 44;
+
+function positionFor(index: number, total: number) {
+  const angle = (360 / total) * index;
+  const rad = (angle * Math.PI) / 180;
+  const x = CENTER + WHEEL_RADIUS * Math.sin(rad) - AVATAR_SIZE / 2;
+  const y = CENTER - WHEEL_RADIUS * Math.cos(rad) - AVATAR_SIZE / 2;
+  return { left: x, top: y };
 }
 
 export default function GameScreen() {
@@ -38,6 +42,11 @@ export default function GameScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [spinning, setSpinning] = useState(false);
+
+  const rotation = useRef(new Animated.Value(0)).current;
+  const rotationBase = useRef(0);
+  const animatedTurnId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -62,6 +71,43 @@ export default function GameScreen() {
     if (!id) return undefined;
     return subscribeToGame(id, load);
   }, [id, load]);
+
+  // Anime la bouteille uniquement pour un tour "frais" (créé il y a moins de 8s).
+  // Un tour plus ancien (réouverture de l'écran) place la bouteille directement
+  // sans animation, pour ne pas rejouer un tirage déjà connu.
+  useEffect(() => {
+    if (!turn || !turn.target_id || players.length < 2) return;
+    if (animatedTurnId.current === turn.id) return;
+
+    const idx = players.findIndex((p) => p.user_id === turn.target_id);
+    if (idx === -1) return;
+
+    animatedTurnId.current = turn.id;
+    const targetAngle = (360 / players.length) * idx;
+    const ageMs = Date.now() - new Date(turn.created_at).getTime();
+
+    if (ageMs > 8000) {
+      rotation.setValue(targetAngle);
+      rotationBase.current = targetAngle;
+      return;
+    }
+
+    const currentMod = ((rotationBase.current % 360) + 360) % 360;
+    let delta = targetAngle - currentMod;
+    delta = ((delta % 360) + 360) % 360;
+    const nextValue = rotationBase.current + 4 * 360 + delta;
+
+    setSpinning(true);
+    Animated.timing(rotation, {
+      toValue: nextValue,
+      duration: 2600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      rotationBase.current = nextValue;
+      setSpinning(false);
+    });
+  }, [turn, players, rotation]);
 
   const myId = session?.user.id;
   const isPlaying = players.some((p) => p.user_id === myId);
@@ -129,6 +175,12 @@ export default function GameScreen() {
   const poserPlayer = players.find((p) => p.user_id === turn?.poser_id);
   const revealedText = turn?.custom_question ?? turn?.game_content?.text_content ?? null;
 
+  const rotateStyle = {
+    transform: [
+      { rotate: rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '1deg'], extrapolate: 'extend' }) },
+    ],
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Action ou Vérité</Text>
@@ -151,22 +203,40 @@ export default function GameScreen() {
       )}
 
       {game.status === 'in_progress' && turn && (
-        <View>
-          <Bottle />
-          <View style={styles.rolesRow}>
-            <View style={styles.roleBlock}>
-              <Avatar name={targetPlayer?.profiles?.display_name ?? '?'} size={48} />
-              <Text style={styles.roleLabel}>Cible (répond)</Text>
-              <Text style={styles.roleName}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
-            </View>
-            <View style={styles.roleBlock}>
-              <Avatar name={poserPlayer?.profiles?.display_name ?? '?'} size={48} />
-              <Text style={styles.roleLabel}>Poseur (pose la question)</Text>
-              <Text style={styles.roleName}>{poserPlayer?.profiles?.display_name ?? '…'}</Text>
-            </View>
+        <View style={{ alignItems: 'center' }}>
+          <View style={styles.wheel}>
+            {players.map((p, i) => {
+              const pos = positionFor(i, players.length);
+              const isRevealedTarget = !spinning && p.user_id === turn.target_id;
+              const isPoserAvatar = p.user_id === turn.poser_id;
+              return (
+                <View key={p.user_id} style={[styles.wheelSlot, pos]}>
+                  <View style={[styles.avatarRing, isPoserAvatar && styles.ringPoser, isRevealedTarget && styles.ringTarget]}>
+                    <Avatar name={p.profiles?.display_name ?? '?'} size={AVATAR_SIZE} />
+                  </View>
+                </View>
+              );
+            })}
+            <Animated.View style={[styles.bottleWrap, rotateStyle]}>
+              <View style={styles.bottleNeck} />
+              <View style={styles.bottleBody} />
+            </Animated.View>
           </View>
 
-          {isTarget && !turn.choice && (
+          {spinning ? (
+            <Text style={styles.spinningText}>La bouteille tourne…</Text>
+          ) : (
+            <View style={styles.rolesRow}>
+              <Text style={styles.roleText}>
+                Cible : <Text style={styles.roleName}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
+              </Text>
+              <Text style={styles.roleText}>
+                Pose la question : <Text style={styles.roleName}>{poserPlayer?.profiles?.display_name ?? '…'}</Text>
+              </Text>
+            </View>
+          )}
+
+          {!spinning && isTarget && !turn.choice && (
             <View style={styles.choiceRow}>
               <Button label="Action" onPress={() => handleChoice('action')} loading={busy} />
               <View style={{ width: spacing.sm }} />
@@ -174,12 +244,12 @@ export default function GameScreen() {
             </View>
           )}
 
-          {!turn.choice && !isTarget && (
+          {!spinning && !turn.choice && !isTarget && (
             <Text style={styles.hint}>En attente du choix Action/Vérité de {targetPlayer?.profiles?.display_name}…</Text>
           )}
 
-          {isPoser && turn.choice && !revealedText && (
-            <View style={{ marginTop: spacing.lg }}>
+          {!spinning && isPoser && turn.choice && !revealedText && (
+            <View style={{ marginTop: spacing.lg, width: '100%' }}>
               <Text style={styles.subtitle}>
                 Pas de question dans la banque pour l'instant — écris-en une pour {targetPlayer?.profiles?.display_name} :
               </Text>
@@ -188,18 +258,18 @@ export default function GameScreen() {
             </View>
           )}
 
-          {!isPoser && turn.choice && !revealedText && (
+          {!spinning && !isPoser && turn.choice && !revealedText && (
             <Text style={styles.hint}>En attente que {poserPlayer?.profiles?.display_name} écrive sa question…</Text>
           )}
 
-          {revealedText && (
+          {!spinning && revealedText && (
             <View style={styles.card}>
               <Text style={styles.cardType}>{turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}</Text>
               <Text style={styles.cardText}>{revealedText}</Text>
             </View>
           )}
 
-          {turn.completed_at && <Button label="Tour suivant" onPress={handleAdvance} loading={busy} />}
+          {!spinning && turn.completed_at && <Button label="Tour suivant" onPress={handleAdvance} loading={busy} />}
         </View>
       )}
     </View>
@@ -208,20 +278,40 @@ export default function GameScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
-  title: { color: colors.text, fontSize: 26, fontWeight: '800', marginTop: spacing.lg, marginBottom: spacing.lg },
+  title: { color: colors.text, fontSize: 26, fontWeight: '800', marginTop: spacing.lg, marginBottom: spacing.lg, textAlign: 'center' },
   subtitle: { color: colors.textMuted, fontSize: 14, marginBottom: spacing.sm },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   playerName: { color: colors.text, fontSize: 16 },
   hint: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' },
-  bottleWrap: { alignItems: 'center', marginBottom: spacing.lg },
+  wheel: { width: WHEEL_SIZE, height: WHEEL_SIZE, marginBottom: spacing.lg },
+  wheelSlot: { position: 'absolute', width: AVATAR_SIZE, height: AVATAR_SIZE },
+  avatarRing: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  ringPoser: { borderColor: colors.textMuted },
+  ringTarget: { borderColor: colors.accent },
+  bottleWrap: {
+    position: 'absolute',
+    left: CENTER - 17,
+    top: CENTER - 45,
+    width: 34,
+    height: 90,
+    alignItems: 'center',
+  },
   bottleNeck: { width: 14, height: 22, backgroundColor: colors.accent, borderTopLeftRadius: 6, borderTopRightRadius: 6 },
-  bottleBody: { width: 34, height: 78, backgroundColor: colors.accent, borderRadius: 14, marginTop: -2 },
-  rolesRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.lg },
-  roleBlock: { alignItems: 'center', maxWidth: 140 },
-  roleLabel: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs, textAlign: 'center' },
-  roleName: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  choiceRow: { flexDirection: 'row', marginTop: spacing.lg },
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg },
+  bottleBody: { width: 34, height: 68, backgroundColor: colors.accent, borderRadius: 14, marginTop: -2 },
+  spinningText: { color: colors.accent, fontSize: 15, fontWeight: '700', marginBottom: spacing.lg },
+  rolesRow: { alignItems: 'center', marginBottom: spacing.lg },
+  roleText: { color: colors.textMuted, fontSize: 14, marginBottom: spacing.xs },
+  roleName: { color: colors.text, fontWeight: '700' },
+  choiceRow: { flexDirection: 'row', marginTop: spacing.sm },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg, width: '100%' },
   cardType: { color: colors.accent, fontWeight: '800', fontSize: 13, marginBottom: spacing.sm },
   cardText: { color: colors.text, fontSize: 18, fontWeight: '600' },
 });

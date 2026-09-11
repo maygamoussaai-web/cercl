@@ -65,3 +65,25 @@ export async function removeCircleMember(circleId: string, userId: string) {
   const { error } = await supabase.from('circle_members').delete().eq('circle_id', circleId).eq('user_id', userId);
   if (error) throw error;
 }
+
+// Ajout direct d'un membre par le créateur (§9 : "ajouter des membres"), sans
+// passer par une invitation. Autorisé par la policy RLS circle_members_insert_by_creator.
+export async function addMemberDirect(circleId: string, userId: string) {
+  const { error } = await supabase.from('circle_members').insert({ circle_id: circleId, user_id: userId });
+  if (error) throw error;
+}
+
+export async function fetchCircleInvites(circleId: string): Promise<CircleInvite[]> {
+  const { data, error } = await supabase
+    .from('circle_invites')
+    .select('*')
+    .eq('circle_id', circleId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as CircleInvite[];
+}
+
+export async function revokeCircleInvite(inviteId: string) {
+  const { error } = await supabase.from('circle_invites').delete().eq('id', inviteId);
+  if (error) throw error;
+}

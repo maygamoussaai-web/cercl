@@ -6,6 +6,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
 import { colors, spacing } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { getCircleConversationId } from '@/lib/api/chat';
 import {
   createCircleInvite,
@@ -17,7 +18,6 @@ import {
 } from '@/lib/api/circles';
 import { fetchActiveGameForCircle } from '@/lib/api/game';
 import { useCirclePresence } from '@/lib/api/presence';
-import { useAuth } from '@/context/AuthContext';
 import type { Circle, CircleMember, Game } from '@/types';
 
 export default function CircleDetailScreen() {
@@ -210,6 +210,14 @@ export default function CircleDetailScreen() {
         ListEmptyComponent={<Text style={styles.subtitle}>Aucun membre pour l'instant.</Text>}
       />
 
+      {isCreator && (
+        <>
+          <Button label="Ajouter un membre" onPress={() => router.push(`/add-member/${id}`)} variant="secondary" />
+          <View style={{ height: spacing.sm }} />
+          <Button label="Gérer les invitations" onPress={() => router.push(`/manage-invites/${id}`)} variant="secondary" />
+          <View style={{ height: spacing.sm }} />
+        </>
+      )}
       <Button label="Discussion du Cercle" onPress={handleOpenChat} variant="secondary" />
       <View style={{ height: spacing.sm }} />
       <Button label="Inviter des potes" onPress={handleInvite} loading={inviting} variant="secondary" />
