@@ -1,22 +1,28 @@
 /**
- * Thème CERCL — PLACEHOLDER technique.
+ * Thème CERCL.
  *
- * Direction imposée par le cahier des charges (§3, §37) : fond sombre, surfaces sombres,
- * couleurs vibrantes utilisées avec modération, contraste élevé, typographie moderne.
+ * Identité : fond quasi noir, deux couleurs de marque — BLEU et ROUGE — et du
+ * noir/blanc pour le reste (bordures, texte, surfaces neutres). Le bleu est la
+ * couleur "primaire" (actions principales, liens, Vérité), le rouge la couleur
+ * "forte" (danger/destructif, Action). Pas d'autre teinte dans l'app.
  *
- * La palette définitive et les assets de marque seront réalisés séparément (§3).
- * Ne pas considérer ces valeurs comme la palette finale de CERCL.
+ * `accent` et `danger` sont conservés comme alias de `blue`/`red` pour ne pas
+ * casser tous les écrans existants qui les référencent déjà.
  */
 export const colors = {
-  background: '#0B0B10',
-  surface: '#16161D',
-  surfaceElevated: '#1E1E27',
-  border: '#2A2A34',
-  accent: '#7C5CFC',
-  text: '#F5F5F7',
-  textMuted: '#9A9AA5',
-  danger: '#FF4D6D',
-  success: '#3DDC97',
+  background: '#07070B',
+  surface: '#111116',
+  surfaceElevated: '#191920',
+  border: '#2A2A33',
+
+  blue: '#2F5CFF',
+  red: '#FF3B3B',
+
+  accent: '#2F5CFF', // alias = blue
+  danger: '#FF3B3B', // alias = red
+
+  text: '#F7F7FA',
+  textMuted: '#9A9AA8',
 } as const;
 
 export const spacing = {
@@ -46,9 +52,13 @@ export const fontSizes = {
 export const shadow = {
   card: {
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
 } as const;
+
+// Dégradé signature de la marque (bleu → rouge), utilisé sur le bouton
+// principal et la bouteille du jeu.
+export const brandGradient = [colors.blue, colors.red] as const;

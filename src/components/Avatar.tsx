@@ -2,7 +2,8 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius } from '@/constants/theme';
 
-const PALETTE = ['#7C5CFC', '#FF4D6D', '#3DDC97', '#FFB020', '#4CC9F0', '#F72585'];
+// Nuances de bleu et de rouge uniquement (identité CERCL à deux couleurs).
+const PALETTE = ['#2F5CFF', '#FF3B3B', '#6C87FF', '#FF6B6B', '#1B3FCC', '#CC2E2E'];
 
 function colorForName(name: string) {
   let hash = 0;
@@ -13,7 +14,8 @@ function colorForName(name: string) {
 type Props = { name: string; size?: number; online?: boolean; uri?: string | null };
 
 // Avatar : affiche la vraie photo (uri) si disponible, sinon une initiale + couleur
-// dérivée du nom. Le point vert optionnel indique la présence en ligne (§13).
+// dérivée du nom (nuance de bleu/rouge). Le point bleu optionnel indique la
+// présence en ligne (§13) — pas de vert, pour rester dans la palette à deux couleurs.
 export function Avatar({ name, size = 40, online, uri }: Props) {
   const safeName = name?.trim() || '?';
   const initial = safeName[0]?.toUpperCase() ?? '?';
@@ -36,7 +38,7 @@ export function Avatar({ name, size = 40, online, uri }: Props) {
               width: dotSize,
               height: dotSize,
               borderRadius: dotSize / 2,
-              backgroundColor: online ? colors.success : colors.textMuted,
+              backgroundColor: online ? colors.blue : colors.textMuted,
             },
           ]}
         />
@@ -47,6 +49,6 @@ export function Avatar({ name, size = 40, online, uri }: Props) {
 
 const styles = StyleSheet.create({
   container: { alignItems: 'center', justifyContent: 'center' },
-  text: { color: '#0B0B10', fontWeight: '800' },
+  text: { color: '#FFFFFF', fontWeight: '800' },
   dot: { position: 'absolute', right: -1, bottom: -1, borderWidth: 2, borderColor: colors.background },
 });

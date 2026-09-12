@@ -14,6 +14,7 @@ export type Circle = {
   name: string;
   image_url: string | null;
   creator_id: UUID;
+  total_play_seconds: number;
   created_at: string;
 };
 

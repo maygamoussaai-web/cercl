@@ -35,6 +35,12 @@ export async function advanceTurn(gameId: string) {
   return data;
 }
 
+export async function finishGame(gameId: string): Promise<Game> {
+  const { data, error } = await supabase.rpc('finish_game', { p_game_id: gameId });
+  if (error) throw error;
+  return data as Game;
+}
+
 export async function fetchLatestTurn(gameId: string) {
   const { data, error } = await supabase
     .from('game_turns')
