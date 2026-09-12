@@ -145,39 +145,39 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   `colors.accent`/`colors.danger` restent comme alias de `blue`/`red` dans le code pour ne
   pas casser les écrans déjà écrits — toute l'app en hérite automatiquement.
 - **PROPOSITION — usage fonctionnel des deux couleurs** : bleu = action principale/lien
-  (bouton "primary", V\u00e9rit\u00e9, poseur, pr\u00e9sence en ligne) ; rouge = destructif/attention
-  (retirer, bloquer, quitter, Action, cible d\u00e9sign\u00e9e par la bouteille). Un d\u00e9grad\u00e9
-  bleu\u2192rouge (`brandGradient`) est utilis\u00e9 sur le bouton principal de toute l'app et sur
-  la bouteille du jeu, comme signature visuelle qui r\u00e9unit les deux couleurs plut\u00f4t que de
-  les juxtaposer platement. Ajout de la d\u00e9pendance `expo-linear-gradient` (module Expo
+  (bouton "primary", Vérité, poseur, présence en ligne) ; rouge = destructif/attention
+  (retirer, bloquer, quitter, Action, cible désignée par la bouteille). Un dégradé
+  bleu→rouge (`brandGradient`) est utilisé sur le bouton principal de toute l'app et sur
+  la bouteille du jeu, comme signature visuelle qui réunit les deux couleurs plutôt que de
+  les juxtaposer platement. Ajout de la dépendance `expo-linear-gradient` (module Expo
   standard, faible risque).
-- **CONSTAT — palette avatar/pr\u00e9sence retravaill\u00e9e** : l'ancienne palette d'avatars
-  (violet/vert/orange/cyan/rose) est remplac\u00e9e par des nuances de bleu et de rouge
-  uniquement. Le point de pr\u00e9sence en ligne, auparavant vert, est maintenant bleu (plus de
-  vert dans l'app, conform\u00e9ment \u00e0 la consigne des deux couleurs strictes).
-- **NON FAIT (report d\u00e9lib\u00e9r\u00e9)** : les ic\u00f4nes/splash de l'app restent le placeholder
-  g\u00e9n\u00e9rique pos\u00e9 en tout d\u00e9but de projet (non committ\u00e9, cf. `assets/README.md`), pas
-  encore mis \u00e0 jour avec les vraies couleurs de marque \u2014 une r\u00e9g\u00e9n\u00e9ration rapide serait
-  possible si souhait\u00e9e, mais n'\u00e9tait pas dans le p\u00e9rim\u00e8tre explicite de cette \u00e9tape.
+- **CONSTAT — palette avatar/présence retravaillée** : l'ancienne palette d'avatars
+  (violet/vert/orange/cyan/rose) est remplacée par des nuances de bleu et de rouge
+  uniquement. Le point de présence en ligne, auparavant vert, est maintenant bleu (plus de
+  vert dans l'app, conformément à la consigne des deux couleurs strictes).
+- **NON FAIT (report délibéré)** : les icônes/splash de l'app restent le placeholder
+  générique posé en tout début de projet (non committé, cf. `assets/README.md`), pas
+  encore mis à jour avec les vraies couleurs de marque — une régénération rapide serait
+  possible si souhaitée, mais n'était pas dans le périmètre explicite de cette étape.
 
-### 2026-09-12 — Trous du jeu combl\u00e9s : fin de partie, mode, classement
-- **CONSTAT \u2014 fin de partie** : nouveau statut `finished` r\u00e9ellement atteignable via la
-  fonction RPC `finish_game` (bouton "Terminer la partie", visible \u00e0 tout joueur pendant une
-  partie en cours \u2014 **PROPOSITION**, le cahier des charges ne pr\u00e9cise pas qui peut terminer
-  une partie, \u00e0 confirmer si \u00e7a doit \u00eatre r\u00e9serv\u00e9 \u00e0 quelqu'un en particulier). \u00c9cran de fin
-  simple ("Partie termin\u00e9e \ud83c\udf89") avec retour au Cercle.
-- **CONSTAT \u2014 correction d'un oubli** : `started_at` n'\u00e9tait en fait jamais renseign\u00e9 sur une
-  partie (oubli\u00e9 lors de la premi\u00e8re impl\u00e9mentation d'`advance_turn`), ce qui aurait fauss\u00e9
-  tout calcul de dur\u00e9e. Corrig\u00e9 : renseign\u00e9 au premier tour de la partie.
-- **CONSTAT \u2014 classement (\u00a732)** : `circles.total_play_seconds` cumule la dur\u00e9e \u00e0 chaque
-  partie termin\u00e9e (calcul\u00e9 c\u00f4t\u00e9 serveur dans `finish_game`, jamais c\u00f4t\u00e9 client). Nouvel
-  \u00e9cran `/leaderboard` accessible depuis la liste des Cercles, tri\u00e9 par temps de jeu cumul\u00e9
-  d\u00e9croissant. Pas encore de d\u00e9coupage par p\u00e9riode (jour/semaine/mois, mentionn\u00e9 comme
-  possible au \u00a732) \u2014 seul le cumul total est affich\u00e9 pour l'instant.
-- **CONSTAT \u2014 choix du mode** : s\u00e9lecteur de mode (Chill / Entre nous / Ambiance / Chaos /
-  Couple) ajout\u00e9 dans l'\u00e9cran du Cercle avant de lancer une partie, transmis \u00e0 `create_game`.
-  Le champ existait d\u00e9j\u00e0 en base sans interface pour le choisir.
-- **RESTE CONNU** : `advance_turn` (logique de tours) toujours non test\u00e9 avec plusieurs
-  vrais comptes simultan\u00e9s \u2014 c'est un premier jet fonctionnel, pas une logique valid\u00e9e en
-  conditions r\u00e9elles (\u00a717 du cahier des charges demande explicitement des tests sur les
-  r\u00e8gles critiques).
+### 2026-09-12 — Trous du jeu comblés : fin de partie, mode, classement
+- **CONSTAT — fin de partie** : nouveau statut `finished` réellement atteignable via la
+  fonction RPC `finish_game` (bouton "Terminer la partie", visible à tout joueur pendant une
+  partie en cours — **PROPOSITION**, le cahier des charges ne précise pas qui peut terminer
+  une partie, à confirmer si ça doit être réservé à quelqu'un en particulier). Écran de fin
+  simple ("Partie terminée 🎉") avec retour au Cercle.
+- **CONSTAT — correction d'un oubli** : `started_at` n'était en fait jamais renseigné sur une
+  partie (oublié lors de la première implémentation d'`advance_turn`), ce qui aurait faussé
+  tout calcul de durée. Corrigé : renseigné au premier tour de la partie.
+- **CONSTAT — classement (§32)** : `circles.total_play_seconds` cumule la durée à chaque
+  partie terminée (calculé côté serveur dans `finish_game`, jamais côté client). Nouvel
+  écran `/leaderboard` accessible depuis la liste des Cercles, trié par temps de jeu cumulé
+  décroissant. Pas encore de découpage par période (jour/semaine/mois, mentionné comme
+  possible au §32) — seul le cumul total est affiché pour l'instant.
+- **CONSTAT — choix du mode** : sélecteur de mode (Chill / Entre nous / Ambiance / Chaos /
+  Couple) ajouté dans l'écran du Cercle avant de lancer une partie, transmis à `create_game`.
+  Le champ existait déjà en base sans interface pour le choisir.
+- **RESTE CONNU** : `advance_turn` (logique de tours) toujours non testé avec plusieurs
+  vrais comptes simultanés — c'est un premier jet fonctionnel, pas une logique validée en
+  conditions réelles (§17 du cahier des charges demande explicitement des tests sur les
+  règles critiques).
