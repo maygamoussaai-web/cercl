@@ -65,12 +65,50 @@ export async function setCustomQuestion(turnId: string, question: string) {
   return data;
 }
 
+export async function setProofRequired(turnId: string, required: boolean) {
+  const { error } = await supabase.rpc('set_proof_required', { p_turn_id: turnId, p_required: required });
+  if (error) throw error;
+}
+
+export async function rerollTurnContent(turnId: string) {
+  const { data, error } = await supabase.rpc('reroll_turn_content', { p_turn_id: turnId });
+  if (error) throw error;
+  return data;
+}
+
+export async function submitTurnResponse(
+  turnId: string,
+  params: { answerText?: string; proofUrl?: string; proofType?: 'photo' | 'video' }
+) {
+  const { error } = await supabase.rpc('submit_turn_response', {
+    p_turn_id: turnId,
+    p_answer_text: params.answerText ?? null,
+    p_proof_url: params.proofUrl ?? null,
+    p_proof_type: params.proofType ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function rateTurn(turnId: string, stars: number) {
+  const { data: userData } = await supabase.auth.getUser();
+  const raterId = userData.user?.id;
+  const { error } = await supabase.from('game_turn_ratings').upsert({ turn_id: turnId, rater_id: raterId, stars });
+  if (error) throw error;
+}
+
+export async function fetchTurnRatings(turnId: string) {
+  const { data, error } = await supabase.from('game_turn_ratings').select('*').eq('turn_id', turnId);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export function subscribeToGame(gameId: string, onChange: () => void) {
   const channel = supabase
     .channel(`game-${gameId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turns', filter: `game_id=eq.${gameId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turn_ratings' }, onChange)
     .subscribe();
 
   return () => {
