@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar } from '@/components/Avatar';
@@ -14,11 +14,17 @@ import {
   fetchGame,
   fetchGamePlayers,
   fetchLatestTurn,
+  fetchTurnRatings,
   finishGame,
   joinGame,
+  rateTurn,
+  rerollTurnContent,
   setCustomQuestion,
+  setProofRequired,
+  submitTurnResponse,
   subscribeToGame,
 } from '@/lib/api/game';
+import { getSignedUrl, pickProofMedia, uploadPrivateFile } from '@/lib/api/media';
 import type { Game } from '@/types';
 
 const WHEEL_SIZE = 260;
@@ -34,6 +40,23 @@ function positionFor(index: number, total: number) {
   return { left: x, top: y };
 }
 
+function ProofViewer({ path, type }: { path: string; type: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    getSignedUrl('game-proofs', path).then(setUrl).catch(() => {});
+  }, [path]);
+
+  if (!url) return <View style={styles.imagePlaceholder} />;
+  if (type === 'video') {
+    return (
+      <Text style={styles.videoLink} onPress={() => Linking.openURL(url)}>
+        ▶ Voir la preuve vidéo
+      </Text>
+    );
+  }
+  return <Image source={{ uri: url }} style={styles.proofImage} />;
+}
+
 export default function GameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -42,9 +65,12 @@ export default function GameScreen() {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [turn, setTurn] = useState<any>(null);
+  const [ratings, setRatings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [answerText, setAnswerText] = useState('');
+  const [pendingProof, setPendingProof] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
   const [spinning, setSpinning] = useState(false);
 
   const rotation = useRef(new Animated.Value(0)).current;
@@ -59,6 +85,11 @@ export default function GameScreen() {
       setGame(g);
       setPlayers(sortedPlayers);
       setTurn(t);
+      if (t?.completed_at) {
+        fetchTurnRatings(t.id).then(setRatings).catch(() => {});
+      } else {
+        setRatings([]);
+      }
     } catch (e: any) {
       Alert.alert('Erreur', e.message);
     } finally {
@@ -74,6 +105,11 @@ export default function GameScreen() {
     if (!id) return undefined;
     return subscribeToGame(id, load);
   }, [id, load]);
+
+  useEffect(() => {
+    setAnswerText('');
+    setPendingProof(null);
+  }, [turn?.id]);
 
   useEffect(() => {
     if (!turn || !turn.target_id || players.length < 2) return;
@@ -167,6 +203,78 @@ export default function GameScreen() {
     }
   };
 
+  const handleToggleRequireProof = async (value: boolean) => {
+    if (!turn) return;
+    try {
+      await setProofRequired(turn.id, value);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleReroll = async () => {
+    if (!turn) return;
+    setBusy(true);
+    try {
+      await rerollTurnContent(turn.id);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message?.includes('NO_OTHER_CONTENT') ? "Pas d'autre question disponible dans cette ambiance." : e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePickProof = async () => {
+    const picked = await pickProofMedia();
+    if (picked) setPendingProof(picked);
+  };
+
+  const handleSubmitResponse = async () => {
+    if (!turn) return;
+    if (turn.choice === 'verite' && !answerText.trim()) {
+      Alert.alert('Réponse manquante', 'Écris ta réponse avant de valider.');
+      return;
+    }
+    if (turn.proof_required && !pendingProof) {
+      Alert.alert('Preuve obligatoire', 'Le poseur a exigé une preuve photo ou vidéo.');
+      return;
+    }
+    setBusy(true);
+    try {
+      let proofUrl: string | undefined;
+      let proofType: 'photo' | 'video' | undefined;
+      if (pendingProof) {
+        const ext = pendingProof.type === 'video' ? 'mp4' : 'jpg';
+        const path = `${turn.id}/${Date.now()}.${ext}`;
+        await uploadPrivateFile('game-proofs', path, pendingProof.uri, pendingProof.type === 'video' ? 'video/mp4' : 'image/jpeg');
+        proofUrl = path;
+        proofType = pendingProof.type;
+      }
+      await submitTurnResponse(turn.id, {
+        answerText: turn.choice === 'verite' ? answerText.trim() : undefined,
+        proofUrl,
+        proofType,
+      });
+      await load();
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRate = async (stars: number) => {
+    if (!turn) return;
+    try {
+      await rateTurn(turn.id, stars);
+      setRatings(await fetchTurnRatings(turn.id));
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
   const handleFinish = () => {
     if (!id) return;
     Alert.alert('Terminer la partie ?', undefined, [
@@ -208,6 +316,8 @@ export default function GameScreen() {
   const targetPlayer = players.find((p) => p.user_id === turn?.target_id);
   const poserPlayer = players.find((p) => p.user_id === turn?.poser_id);
   const revealedText = turn?.custom_question ?? turn?.game_content?.text_content ?? null;
+  const myStars = ratings.find((r) => r.rater_id === myId)?.stars ?? 0;
+  const avgStars = ratings.length ? ratings.reduce((s, r) => s + r.stars, 0) / ratings.length : null;
 
   const rotateStyle = {
     transform: [
@@ -306,6 +416,82 @@ export default function GameScreen() {
                 {turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}
               </Text>
               <Text style={styles.cardText}>{revealedText}</Text>
+
+              {isPoser && !turn.completed_at && (
+                <View style={styles.poserControls}>
+                  <Pressable style={styles.checkboxRow} onPress={() => handleToggleRequireProof(!turn.proof_required)}>
+                    <View style={[styles.checkbox, turn.proof_required && styles.checkboxChecked]} />
+                    <Text style={styles.checkboxLabel}>Exiger une preuve (photo/vidéo)</Text>
+                  </Pressable>
+                  {turn.content_id && (
+                    <Text style={styles.rerollLink} onPress={handleReroll}>
+                      Changer la question
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {isTarget && !turn.completed_at && (
+                <View style={{ marginTop: spacing.md }}>
+                  {turn.choice === 'verite' && (
+                    <TextField placeholder="Ta réponse" value={answerText} onChangeText={setAnswerText} multiline />
+                  )}
+                  <Text style={styles.proofLabel}>
+                    {turn.proof_required ? 'Preuve obligatoire (photo ou vidéo)' : 'Preuve facultative (photo ou vidéo)'}
+                  </Text>
+                  {pendingProof && (
+                    <Text style={styles.proofPicked}>{pendingProof.type === 'video' ? '🎥 Vidéo prête' : '📷 Photo prête'}</Text>
+                  )}
+                  <Button
+                    label={pendingProof ? 'Changer la preuve' : 'Ajouter une preuve'}
+                    onPress={handlePickProof}
+                    variant="secondary"
+                  />
+                  <View style={{ height: spacing.sm }} />
+                  <Button label="Valider" onPress={handleSubmitResponse} loading={busy} />
+                </View>
+              )}
+
+              {!isTarget && !isPoser && !turn.completed_at && (
+                <Text style={styles.hint}>En attente de {targetPlayer?.profiles?.display_name}…</Text>
+              )}
+              {isPoser && !isTarget && !turn.completed_at && (
+                <Text style={styles.hint}>En attente de la réponse de {targetPlayer?.profiles?.display_name}…</Text>
+              )}
+
+              {turn.completed_at && (
+                <View style={{ marginTop: spacing.md }}>
+                  {turn.answer_text && (
+                    <>
+                      <Text style={styles.answerLabel}>Réponse :</Text>
+                      <Text style={styles.answerTextStyle}>{turn.answer_text}</Text>
+                    </>
+                  )}
+                  {turn.proof_url && (
+                    <View style={{ marginTop: spacing.sm }}>
+                      <ProofViewer path={turn.proof_url} type={turn.proof_type} />
+                    </View>
+                  )}
+
+                  {!isTarget && (
+                    <View style={styles.ratingRow}>
+                      <Text style={styles.ratingLabel}>Note la prestation :</Text>
+                      <View style={{ flexDirection: 'row' }}>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Text key={n} style={styles.star} onPress={() => handleRate(n)}>
+                            {myStars >= n ? '★' : '☆'}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  {avgStars !== null && (
+                    <Text style={styles.avgRating}>
+                      Moyenne : {avgStars.toFixed(1)} / 5 ({ratings.length} vote{ratings.length > 1 ? 's' : ''})
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           )}
 
@@ -357,6 +543,23 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, padding: spacing.lg, marginTop: spacing.lg, width: '100%' },
   cardType: { fontWeight: '800', fontSize: 13, marginBottom: spacing.sm },
   cardText: { color: colors.text, fontSize: 18, fontWeight: '600' },
+  poserControls: { marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: colors.border },
+  checkboxChecked: { backgroundColor: colors.blue, borderColor: colors.blue },
+  checkboxLabel: { color: colors.text, fontSize: 14 },
+  rerollLink: { color: colors.blue, fontSize: 13, fontWeight: '600' },
+  proofLabel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm, marginBottom: spacing.sm },
+  proofPicked: { color: colors.text, fontSize: 13, marginBottom: spacing.sm },
+  answerLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },
+  answerTextStyle: { color: colors.text, fontSize: 16 },
+  imagePlaceholder: { width: 200, height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceElevated },
+  proofImage: { width: 200, height: 200, borderRadius: radius.md },
+  videoLink: { color: colors.blue, fontSize: 14, fontWeight: '700' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
+  ratingLabel: { color: colors.textMuted, fontSize: 13 },
+  star: { fontSize: 24, color: colors.red, marginLeft: 2 },
+  avgRating: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm },
   finishedContainer: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, alignItems: 'center', justifyContent: 'center' },
   finishedEmoji: { fontSize: 48, marginBottom: spacing.md },
   finishedTitle: { color: colors.text, fontSize: 26, fontWeight: '800', marginBottom: spacing.xs },
