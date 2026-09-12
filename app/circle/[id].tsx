@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, FlatList, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radius, spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { getCircleConversationId } from '@/lib/api/chat';
 import {
@@ -23,6 +23,14 @@ import { pickImage, uploadPublicImage } from '@/lib/api/media';
 import { useCirclePresence } from '@/lib/api/presence';
 import type { Circle, CircleMember, Game } from '@/types';
 
+const MODES = [
+  { key: 'chill', label: 'Chill' },
+  { key: 'entre_nous', label: 'Entre nous' },
+  { key: 'ambiance', label: 'Ambiance' },
+  { key: 'chaos', label: 'Chaos' },
+  { key: 'couple', label: 'Couple' },
+];
+
 export default function CircleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -37,6 +45,7 @@ export default function CircleDetailScreen() {
   const [newName, setNewName] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const [selectedMode, setSelectedMode] = useState('chill');
 
   const myId = session?.user.id;
   const online = useCirclePresence(id, myId);
@@ -86,7 +95,7 @@ export default function CircleDetailScreen() {
     }
     setLaunching(true);
     try {
-      const g = await launchGame(id);
+      const g = await launchGame(id, selectedMode);
       router.push(`/game/${g.id}`);
     } catch (e: any) {
       if (e.message?.includes('GAME_ALREADY_ACTIVE')) {
@@ -288,6 +297,24 @@ export default function CircleDetailScreen() {
       <Button label="Discussion du Cercle" onPress={handleOpenChat} variant="secondary" />
       <View style={{ height: spacing.sm }} />
       <Button label="Inviter des potes" onPress={handleInvite} loading={inviting} variant="secondary" />
+
+      {!activeGame && (
+        <>
+          <View style={{ height: spacing.lg }} />
+          <Text style={styles.modeLabel}>Ambiance de la partie</Text>
+          <View style={styles.modeRow}>
+            {MODES.map((m) => (
+              <Pressable
+                key={m.key}
+                onPress={() => setSelectedMode(m.key)}
+                style={[styles.modeChip, selectedMode === m.key && styles.modeChipActive]}
+              >
+                <Text style={[styles.modeChipText, selectedMode === m.key && styles.modeChipTextActive]}>{m.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
       <View style={{ height: spacing.sm }} />
       <Button label={activeGame ? 'Rejoindre la partie' : 'Lancer une partie'} onPress={handleLaunch} loading={launching} />
 
@@ -305,7 +332,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.lg },
   title: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  editLink: { color: colors.accent, fontSize: 13, fontWeight: '600', marginTop: spacing.xs },
+  editLink: { color: colors.blue, fontSize: 13, fontWeight: '600', marginTop: spacing.xs },
   subtitle: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   memberRow: {
     flexDirection: 'row',
@@ -316,6 +343,18 @@ const styles = StyleSheet.create({
   },
   memberName: { color: colors.text, fontSize: 16, fontWeight: '600' },
   memberHandle: { color: colors.textMuted, fontSize: 14 },
-  removeLink: { color: colors.danger, fontSize: 13, fontWeight: '600' },
-  transferLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  removeLink: { color: colors.red, fontSize: 13, fontWeight: '600' },
+  transferLink: { color: colors.blue, fontSize: 13, fontWeight: '600' },
+  modeLabel: { color: colors.textMuted, fontSize: 13, fontWeight: '600', marginBottom: spacing.sm },
+  modeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  modeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modeChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
+  modeChipText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  modeChipTextActive: { color: '#FFFFFF' },
 });
