@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
-import { colors, radius, spacing } from '@/constants/theme';
+import { brandGradient, colors, radius, spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import {
   advanceTurn,
@@ -13,6 +14,7 @@ import {
   fetchGame,
   fetchGamePlayers,
   fetchLatestTurn,
+  finishGame,
   joinGame,
   setCustomQuestion,
   subscribeToGame,
@@ -34,6 +36,7 @@ function positionFor(index: number, total: number) {
 
 export default function GameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { session } = useAuth();
 
   const [game, setGame] = useState<Game | null>(null);
@@ -164,8 +167,42 @@ export default function GameScreen() {
     }
   };
 
+  const handleFinish = () => {
+    if (!id) return;
+    Alert.alert('Terminer la partie ?', undefined, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Terminer',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await finishGame(id);
+            await load();
+          } catch (e: any) {
+            Alert.alert('Erreur', e.message);
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading || !game) {
     return <View style={styles.container} />;
+  }
+
+  if (game.status === 'finished') {
+    return (
+      <View style={styles.finishedContainer}>
+        <Text style={styles.finishedEmoji}>🎉</Text>
+        <Text style={styles.finishedTitle}>Partie terminée</Text>
+        <Text style={styles.subtitle}>Merci d'avoir joué !</Text>
+        <View style={{ height: spacing.lg }} />
+        <Button label="Retour au Cercle" onPress={() => router.replace(`/circle/${game.circle_id}`)} />
+      </View>
+    );
   }
 
   const targetPlayer = players.find((p) => p.user_id === turn?.target_id);
@@ -215,8 +252,8 @@ export default function GameScreen() {
               );
             })}
             <Animated.View style={[styles.bottleWrap, rotateStyle]}>
-              <View style={styles.bottleNeck} />
-              <View style={styles.bottleBody} />
+              <LinearGradient colors={brandGradient} style={styles.bottleNeck} />
+              <LinearGradient colors={brandGradient} style={styles.bottleBody} />
             </Animated.View>
           </View>
 
@@ -225,19 +262,23 @@ export default function GameScreen() {
           ) : (
             <View style={styles.rolesRow}>
               <Text style={styles.roleText}>
-                Cible : <Text style={styles.roleName}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
+                Cible : <Text style={[styles.roleName, { color: colors.red }]}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
               </Text>
               <Text style={styles.roleText}>
-                Pose la question : <Text style={styles.roleName}>{poserPlayer?.profiles?.display_name ?? '…'}</Text>
+                Pose la question : <Text style={[styles.roleName, { color: colors.blue }]}>{poserPlayer?.profiles?.display_name ?? '…'}</Text>
               </Text>
             </View>
           )}
 
           {!spinning && isTarget && !turn.choice && (
             <View style={styles.choiceRow}>
-              <Button label="Action" onPress={() => handleChoice('action')} loading={busy} />
+              <View style={{ flex: 1 }}>
+                <Button label="Action" onPress={() => handleChoice('action')} loading={busy} variant="danger" />
+              </View>
               <View style={{ width: spacing.sm }} />
-              <Button label="Vérité" onPress={() => handleChoice('verite')} loading={busy} variant="secondary" />
+              <View style={{ flex: 1 }}>
+                <Button label="Vérité" onPress={() => handleChoice('verite')} loading={busy} variant="primary" />
+              </View>
             </View>
           )}
 
@@ -260,13 +301,18 @@ export default function GameScreen() {
           )}
 
           {!spinning && revealedText && (
-            <View style={styles.card}>
-              <Text style={styles.cardType}>{turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}</Text>
+            <View style={[styles.card, { borderColor: turn.choice === 'action' ? colors.red : colors.blue }]}>
+              <Text style={[styles.cardType, { color: turn.choice === 'action' ? colors.red : colors.blue }]}>
+                {turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}
+              </Text>
               <Text style={styles.cardText}>{revealedText}</Text>
             </View>
           )}
 
           {!spinning && turn.completed_at && <Button label="Tour suivant" onPress={handleAdvance} loading={busy} />}
+
+          <View style={{ height: spacing.md }} />
+          <Button label="Terminer la partie" onPress={handleFinish} variant="secondary" loading={busy} />
         </View>
       )}
     </View>
@@ -291,8 +337,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  ringPoser: { borderColor: colors.textMuted },
-  ringTarget: { borderColor: colors.accent },
+  ringPoser: { borderColor: colors.blue },
+  ringTarget: { borderColor: colors.red },
   bottleWrap: {
     position: 'absolute',
     left: CENTER - 17,
@@ -301,14 +347,17 @@ const styles = StyleSheet.create({
     height: 90,
     alignItems: 'center',
   },
-  bottleNeck: { width: 14, height: 22, backgroundColor: colors.accent, borderTopLeftRadius: 6, borderTopRightRadius: 6 },
-  bottleBody: { width: 34, height: 68, backgroundColor: colors.accent, borderRadius: 14, marginTop: -2 },
-  spinningText: { color: colors.accent, fontSize: 15, fontWeight: '700', marginBottom: spacing.lg },
+  bottleNeck: { width: 14, height: 22, borderTopLeftRadius: 6, borderTopRightRadius: 6 },
+  bottleBody: { width: 34, height: 68, borderRadius: 14, marginTop: -2 },
+  spinningText: { color: colors.text, fontSize: 15, fontWeight: '700', marginBottom: spacing.lg },
   rolesRow: { alignItems: 'center', marginBottom: spacing.lg },
   roleText: { color: colors.textMuted, fontSize: 14, marginBottom: spacing.xs },
-  roleName: { color: colors.text, fontWeight: '700' },
-  choiceRow: { flexDirection: 'row', marginTop: spacing.sm },
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg, width: '100%' },
-  cardType: { color: colors.accent, fontWeight: '800', fontSize: 13, marginBottom: spacing.sm },
+  roleName: { fontWeight: '800' },
+  choiceRow: { flexDirection: 'row', marginTop: spacing.sm, width: '100%' },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, padding: spacing.lg, marginTop: spacing.lg, width: '100%' },
+  cardType: { fontWeight: '800', fontSize: 13, marginBottom: spacing.sm },
   cardText: { color: colors.text, fontSize: 18, fontWeight: '600' },
+  finishedContainer: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, alignItems: 'center', justifyContent: 'center' },
+  finishedEmoji: { fontSize: 48, marginBottom: spacing.md },
+  finishedTitle: { color: colors.text, fontSize: 26, fontWeight: '800', marginBottom: spacing.xs },
 });

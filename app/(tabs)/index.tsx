@@ -29,9 +29,14 @@ export default function CerclesScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Cercles</Text>
-        <Pressable style={styles.addButton} onPress={() => router.push('/circle/create')}>
-          <Text style={styles.addButtonText}>+</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Text style={styles.leaderboardLink} onPress={() => router.push('/leaderboard')}>
+            Classement
+          </Text>
+          <Pressable style={styles.addButton} onPress={() => router.push('/circle/create')}>
+            <Text style={styles.addButtonText}>+</Text>
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
@@ -61,8 +66,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
-  addButton: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  addButtonText: { color: '#0B0B10', fontSize: 22, fontWeight: '700', lineHeight: 24 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  leaderboardLink: { color: colors.blue, fontSize: 14, fontWeight: '600' },
+  addButton: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center' },
+  addButtonText: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 24 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
