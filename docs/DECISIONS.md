@@ -151,8 +151,7 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   lui-même. Il faut configurer un fournisseur tiers (Twilio recommandé, ou Vonage/
   MessageBird) dans le dashboard Supabase (Authentication → Providers → Phone), avec un
   compte et des identifiants propres au propriétaire du projet — je ne peux pas le faire
-  depuis ici. Tant que ce n'est pas fait, "Recevoir le code" échouera. Étapes détaillées :
-  `docs/AUTH_PHONE_SETUP.md`.
+  depuis ici. Tant que ce n'est pas fait, "Recevoir le code" échouera.
 - **CORRECTION (précision du propriétaire du projet)** : c'est le **poseur**, pas la
   cible, qui écrit la question personnalisée quand la banque est vide (§31). Corrige la
   décision du 2026-09-09 qui avait implémenté l'inverse par lecture littérale ambiguë du
@@ -228,3 +227,30 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   app links). Nécessite un nom de domaine réellement possédé, une page hébergée, et les
   identifiants Apple Team ID / Google — tout ce que le propriétaire du projet a
   explicitement mis de côté pour plus tard (build, identifiants d'app, banque de contenu).
+
+### 2026-09-12 — Changement d'authentification : téléphone → email + Google
+- **EXIGENCE (décision du propriétaire du projet, remplace le téléphone/SMS du
+  2026-09-11)** : l'authentification se fait maintenant par **email + mot de passe** et
+  par **Google**. Le flux téléphone/OTP (`verify-otp.tsx`, `docs/AUTH_PHONE_SETUP.md`) est
+  retiré du repo — deuxième changement de méthode d'authentification en une semaine, donc
+  vigilance particulière recommandée avant un nouveau changement pour éviter de refaire ce
+  travail une troisième fois.
+- **PROPOSITION** : email + **mot de passe** classique choisi plutôt qu'un lien magique ou
+  un code par email, par cohérence avec ce qui se fait le plus couramment et pour éviter la
+  complexité supplémentaire du deep-linking d'un lien magique. À signaler si un lien
+  magique est préféré.
+- **CONSTAT — Google OAuth** : implémenté via le flux web standard de Supabase
+  (`supabase.auth.signInWithOAuth` + navigateur système via `expo-web-browser`, tokens
+  récupérés depuis l'URL de redirection puis posés avec `setSession`), pas de SDK natif
+  Google Sign-In (éviterait un aller-retour navigateur mais demande une configuration
+  native Android/iOS supplémentaire — noté comme amélioration possible plus tard).
+- **CONTRAINTE TECHNIQUE (bloquante, pas encore levée)** : nécessite un client OAuth
+  Google créé dans Google Cloud Console (compte propre au propriétaire du projet) avec
+  comme redirect URI `https://bwlwcmcybqyxwtqluddx.supabase.co/auth/v1/callback`, puis
+  Client ID/Secret renseignés dans Supabase (Authentication → Providers → Google), et
+  `cercl://` ajouté à la liste des Redirect URLs autorisées côté Supabase. Sans cette
+  configuration externe, "Continuer avec Google" échouera. Étapes détaillées :
+  `docs/AUTH_GOOGLE_SETUP.md`.
+- **CONSTAT** : aucune migration Supabase nécessaire pour ce changement (l'authentification
+  par téléphone ou email/Google est une configuration du service Auth, pas un changement
+  de schéma — `profiles` reste inchangée).
