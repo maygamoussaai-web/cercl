@@ -35,7 +35,7 @@ export default function ProfilScreen() {
       </Text>
       <Text style={styles.name}>{profile?.display_name ?? '…'}</Text>
       <Text style={styles.handle}>@{profile?.handle}</Text>
-      {session?.user.phone && <Text style={styles.phone}>{session.user.phone}</Text>}
+      {session?.user.email && <Text style={styles.email}>{session.user.email}</Text>}
 
       <View style={{ height: spacing.xl }} />
       <Button
@@ -57,5 +57,5 @@ const styles = StyleSheet.create({
   changePhoto: { color: colors.accent, fontSize: 13, fontWeight: '600', marginTop: spacing.sm },
   name: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: spacing.lg },
   handle: { color: colors.textMuted, fontSize: 15, marginTop: spacing.xs },
-  phone: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
+  email: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs },
 });

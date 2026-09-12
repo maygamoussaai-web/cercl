@@ -8,17 +8,23 @@ import { colors, spacing } from '@/constants/theme';
 import { signInWithGoogle } from '@/lib/api/oauth';
 import { supabase } from '@/lib/supabase';
 
-export default function SignInScreen() {
+export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleSignIn = async () => {
+  const handleSignUp = async () => {
+    if (password.length < 6) {
+      Alert.alert('Mot de passe trop court', 'Utilise au moins 6 caractères.');
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
     setLoading(false);
-    if (error) Alert.alert('Connexion impossible', error.message);
+    if (error) {
+      Alert.alert('Inscription impossible', error.message);
+    }
   };
 
   const handleGoogle = async () => {
@@ -34,8 +40,7 @@ export default function SignInScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>CERCL</Text>
-      <Text style={styles.subtitle}>Retrouve tes potes.</Text>
+      <Text style={styles.title}>Créer un compte</Text>
 
       <TextField
         label="Email"
@@ -46,13 +51,13 @@ export default function SignInScreen() {
       />
       <TextField label="Mot de passe" secureTextEntry value={password} onChangeText={setPassword} />
 
-      <Button label="Se connecter" onPress={handleSignIn} loading={loading} />
+      <Button label="Créer mon compte" onPress={handleSignUp} loading={loading} />
 
       <View style={{ height: spacing.md }} />
       <Button label="Continuer avec Google" onPress={handleGoogle} loading={googleLoading} variant="secondary" />
 
-      <Link href="/sign-up" style={styles.link}>
-        <Text style={styles.linkText}>Pas encore de compte ? Créer un compte</Text>
+      <Link href="/sign-in" style={styles.link}>
+        <Text style={styles.linkText}>Déjà un compte ? Se connecter</Text>
       </Link>
     </KeyboardAvoidingView>
   );
@@ -60,8 +65,7 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, justifyContent: 'center' },
-  title: { color: colors.text, fontSize: 36, fontWeight: '800', marginBottom: spacing.xs },
-  subtitle: { color: colors.textMuted, fontSize: 16, marginBottom: spacing.xl },
+  title: { color: colors.text, fontSize: 32, fontWeight: '800', marginBottom: spacing.xl },
   link: { marginTop: spacing.lg, alignSelf: 'center' },
   linkText: { color: colors.accent, fontSize: 14 },
 });

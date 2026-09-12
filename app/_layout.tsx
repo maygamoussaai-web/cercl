@@ -15,7 +15,7 @@ function RootNavigation() {
     if (loading) return;
 
     const first = segments[0] as string | undefined;
-    const inAuthScreen = first === 'sign-in' || first === 'verify-otp';
+    const inAuthScreen = first === 'sign-in' || first === 'sign-up';
     const inOnboarding = first === 'onboarding';
     const inJoin = first === 'join';
 
