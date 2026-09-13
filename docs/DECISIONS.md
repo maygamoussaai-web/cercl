@@ -181,3 +181,32 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   vrais comptes simultanés — c'est un premier jet fonctionnel, pas une logique validée en
   conditions réelles (§17 du cahier des charges demande explicitement des tests sur les
   règles critiques).
+
+### 2026-09-12 — Réponse Vérité, preuve Action, exigence de preuve, rejeu de question, notation 5 étoiles
+- **EXIGENCE (précisions apportées par le propriétaire du projet)** :
+  - Vérité : la cible doit obligatoirement taper sa réponse (texte) pour que le tour soit
+    considéré terminé — pas seulement lire la question.
+  - Action : la preuve prend la forme d'une photo ou d'une vidéo.
+  - Le poseur peut cocher "Exiger une preuve", même sur une question venant de la banque.
+    Si coché, la cible a l'obligation d'ajouter une preuve (photo ou vidéo) avant de
+    pouvoir valider. Si non coché, la cible peut choisir d'en ajouter une ou non.
+  - Le poseur dispose d'un bouton "Changer la question" pour obtenir une autre proposition
+    de la banque (uniquement quand le contenu vient de la banque, pas sur une question
+    personnalisée).
+  - Notation 5 étoiles de la cible par les autres joueurs, une fois le tour terminé.
+- **CONSTAT — implémentation** : `game_turns` étendue (`answer_text`, `proof_required`,
+  `proof_url`, `proof_type`). Nouvelle table `game_turn_ratings` (une note par joueur et
+  par tour, mise à jour possible). Nouveau bucket Storage privé `game-proofs` (accès
+  restreint aux joueurs de la partie concernée). Toutes les écritures passent par des RPC
+  dédiées (`submit_turn_response`, `set_proof_required`, `reroll_turn_content`) qui
+  valident les règles côté serveur (réponse obligatoire pour Vérité, preuve obligatoire
+  si exigée, un seul rejet possible si le contenu vient bien de la banque).
+- **PROPOSITION — qui peut noter** : "les autres" a été interprété comme tous les joueurs
+  de la partie sauf la cible elle-même (poseur inclus), pas seulement le poseur — à
+  confirmer si la notation doit être restreinte davantage.
+- **PROPOSITION — étoiles rouges** : par cohérence avec la contrainte des deux couleurs
+  (bleu/rouge uniquement, pas de jaune/doré habituel pour une notation), les étoiles
+  pleines sont rouges plutôt que dorées.
+- **CONSTAT — vidéo** : pas de lecteur vidéo intégré (éviterait d'ajouter la dépendance
+  `expo-av`) ; une preuve vidéo s'ouvre dans le lecteur/navigateur du téléphone via un
+  lien "Voir la preuve vidéo".
