@@ -1,4 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 import { supabase } from '@/lib/supabase';
 
@@ -54,4 +56,16 @@ export async function getSignedUrl(bucket: string, path: string, expiresSeconds 
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresSeconds);
   if (error) throw error;
   return data.signedUrl;
+}
+
+// Télécharge un fichier distant (photo ou vidéo) et l'enregistre directement
+// dans la pellicule/galerie du téléphone.
+export async function downloadMediaToDevice(url: string, extension: string) {
+  const permission = await MediaLibrary.requestPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Permission refusée pour enregistrer sur ton téléphone.');
+  }
+  const fileUri = `${FileSystem.cacheDirectory}cercl-preuve-${Date.now()}.${extension}`;
+  const { uri } = await FileSystem.downloadAsync(url, fileUri);
+  await MediaLibrary.saveToLibraryAsync(uri);
 }

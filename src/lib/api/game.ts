@@ -102,6 +102,17 @@ export async function fetchTurnRatings(turnId: string) {
   return data ?? [];
 }
 
+export async function fetchTurnAcks(turnId: string) {
+  const { data, error } = await supabase.from('game_turn_acks').select('*').eq('turn_id', turnId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function ackTurn(turnId: string) {
+  const { error } = await supabase.rpc('ack_turn_and_advance', { p_turn_id: turnId });
+  if (error) throw error;
+}
+
 export function subscribeToGame(gameId: string, onChange: () => void) {
   const channel = supabase
     .channel(`game-${gameId}`)
@@ -109,6 +120,7 @@ export function subscribeToGame(gameId: string, onChange: () => void) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turns', filter: `game_id=eq.${gameId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turn_ratings' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_turn_acks' }, onChange)
     .subscribe();
 
   return () => {
