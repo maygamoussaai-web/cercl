@@ -199,14 +199,43 @@ ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas
   par tour, mise à jour possible). Nouveau bucket Storage privé `game-proofs` (accès
   restreint aux joueurs de la partie concernée). Toutes les écritures passent par des RPC
   dédiées (`submit_turn_response`, `set_proof_required`, `reroll_turn_content`) qui
-  valident les règles côté serveur (réponse obligatoire pour Vérité, preuve obligatoire
-  si exigée, un seul rejet possible si le contenu vient bien de la banque).
-- **PROPOSITION — qui peut noter** : "les autres" a été interprété comme tous les joueurs
-  de la partie sauf la cible elle-même (poseur inclus), pas seulement le poseur — à
-  confirmer si la notation doit être restreinte davantage.
-- **PROPOSITION — étoiles rouges** : par cohérence avec la contrainte des deux couleurs
-  (bleu/rouge uniquement, pas de jaune/doré habituel pour une notation), les étoiles
-  pleines sont rouges plutôt que dorées.
-- **CONSTAT — vidéo** : pas de lecteur vidéo intégré (éviterait d'ajouter la dépendance
-  `expo-av`) ; une preuve vidéo s'ouvre dans le lecteur/navigateur du téléphone via un
-  lien "Voir la preuve vidéo".
+  valident les règles côté serveur.
+- **PROPOSITION — qui peut noter** : "les autres" interprété comme tous les joueurs sauf la
+  cible (poseur inclus), à confirmer si ça doit être plus restreint.
+
+### 2026-09-13 — Correction création de compte, étoiles dorées, réponse/preuve au centre du cercle, téléchargement
+- **BUG CORRIGÉ (signalé par le propriétaire du projet comme prioritaire)** : la création
+  de compte semblait ne pas fonctionner. Cause réelle : Supabase exige une confirmation
+  par email par défaut ; `signUp` réussissait bel et bien, mais l'app n'affichait aucun
+  retour dans ce cas (aucune session créée, aucun message), donnant l'impression que rien
+  ne s'était passé. Corrigé : un message "Vérifie tes emails" s'affiche désormais quand
+  aucune session n'est retournée. Rappel : "Confirm email" peut être désactivé dans le
+  dashboard Supabase (Authentication → Providers → Email) pour un test immédiat sans email.
+- **CORRECTION (précision du propriétaire du projet)** : les étoiles de notation sont
+  **dorées** (`colors.gold`, `#FFC93C`), pas rouges comme précédemment choisi par défaut —
+  exception explicitement voulue à la règle des deux couleurs strictes.
+- **EXIGENCE (précision du déroulé du jeu)** : une fois la cible soumise (réponse Vérité ou
+  preuve Action), le résultat s'affiche **au centre du cercle** (à la place de la
+  bouteille) — question, réponse/preuve, et étoiles de notation — et y reste visible tant
+  que tous les joueurs n'ont pas appuyé sur "Suivant". Une fois que TOUS l'ont fait
+  (pas juste un seul comme avant), le tour est supprimé de la base de données et un
+  nouveau tour est généré, ce qui relance la bouteille pour tout le monde en même temps.
+  Implémenté via une nouvelle table `game_turn_acks` (un acquittement par joueur et par
+  tour) et une fonction RPC `ack_turn_and_advance` qui supprime le tour et enchaîne
+  automatiquement sur `advance_turn` une fois que le compte d'acquittements atteint le
+  nombre de joueurs. Le bouton "Suivant" affiche maintenant un compteur (ex. "Suivant
+  (2/4)"), et se transforme en "En attente des autres…" une fois qu'on a soi-même validé.
+- **CONSTAT — téléchargement des preuves** : icône ⬇ sous chaque photo/vidéo de preuve,
+  qui télécharge le fichier et l'enregistre directement dans la galerie du téléphone
+  (`expo-file-system` + `expo-media-library`, nouvelles dépendances). Nécessite la
+  permission d'accès aux photos, déjà configurée dans `app.json`.
+- **LIMITE CONNUE (non traitée)** : la ligne de la base de données est bien supprimée, mais
+  le fichier de preuve (photo/vidéo) reste dans le bucket Storage `game-proofs` (fichier
+  orphelin) — supprimer aussi le fichier demanderait un appel à l'API Storage depuis la
+  fonction serveur, plus complexe à faire de façon fiable ; un nettoyage périodique des
+  fichiers orphelins (sur le modèle du nettoyage des messages) pourrait être ajouté plus
+  tard si le volume de stockage devient un sujet.
+- **CONSTAT — app.json** : la configuration des plugins (permissions photos/notifications)
+  avait disparu du fichier entre deux étapes précédentes (raison inconnue — pas une action
+  volontaire de ma part) ; restaurée et complétée avec la permission d'écriture nécessaire
+  au téléchargement.
