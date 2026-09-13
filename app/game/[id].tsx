@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, Animated, Easing, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar } from '@/components/Avatar';
@@ -9,11 +9,13 @@ import { TextField } from '@/components/TextField';
 import { brandGradient, colors, radius, spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import {
+  ackTurn,
   advanceTurn,
   chooseTurnType,
   fetchGame,
   fetchGamePlayers,
   fetchLatestTurn,
+  fetchTurnAcks,
   fetchTurnRatings,
   finishGame,
   joinGame,
@@ -24,13 +26,14 @@ import {
   submitTurnResponse,
   subscribeToGame,
 } from '@/lib/api/game';
-import { getSignedUrl, pickProofMedia, uploadPrivateFile } from '@/lib/api/media';
+import { downloadMediaToDevice, getSignedUrl, pickProofMedia, uploadPrivateFile } from '@/lib/api/media';
 import type { Game } from '@/types';
 
 const WHEEL_SIZE = 260;
 const WHEEL_RADIUS = 96;
 const CENTER = WHEEL_SIZE / 2;
 const AVATAR_SIZE = 44;
+const REVEAL_SIZE = 190;
 
 function positionFor(index: number, total: number) {
   const angle = (360 / total) * index;
@@ -40,21 +43,52 @@ function positionFor(index: number, total: number) {
   return { left: x, top: y };
 }
 
-function ProofViewer({ path, type }: { path: string; type: string }) {
+function ProofViewer({ path, type, compact }: { path: string; type: string; compact?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
   useEffect(() => {
     getSignedUrl('game-proofs', path).then(setUrl).catch(() => {});
   }, [path]);
 
-  if (!url) return <View style={styles.imagePlaceholder} />;
-  if (type === 'video') {
-    return (
-      <Text style={styles.videoLink} onPress={() => Linking.openURL(url)}>
-        ▶ Voir la preuve vidéo
-      </Text>
-    );
+  const handleDownload = async () => {
+    if (!url) return;
+    setDownloading(true);
+    try {
+      await downloadMediaToDevice(url, type === 'video' ? 'mp4' : 'jpg');
+      Alert.alert('Enregistré', 'La preuve a été enregistrée dans tes photos.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (!url) {
+    return <View style={[styles.imagePlaceholder, compact && styles.imagePlaceholderCompact]} />;
   }
-  return <Image source={{ uri: url }} style={styles.proofImage} />;
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      {type === 'video' ? (
+        <Pressable onPress={() => Linking.openURL(url)} style={[styles.videoBox, compact && styles.videoBoxCompact]}>
+          <Text style={styles.videoPlayIcon}>▶</Text>
+        </Pressable>
+      ) : (
+        <Image source={{ uri: url }} style={[styles.proofImage, compact && styles.proofImageCompact]} />
+      )}
+      <Pressable onPress={handleDownload} style={styles.downloadRow} disabled={downloading}>
+        {downloading ? (
+          <ActivityIndicator color={colors.blue} size="small" />
+        ) : (
+          <>
+            <Text style={styles.downloadIcon}>⬇</Text>
+            <Text style={styles.downloadLabel}>Télécharger</Text>
+          </>
+        )}
+      </Pressable>
+    </View>
+  );
 }
 
 export default function GameScreen() {
@@ -66,6 +100,7 @@ export default function GameScreen() {
   const [players, setPlayers] = useState<any[]>([]);
   const [turn, setTurn] = useState<any>(null);
   const [ratings, setRatings] = useState<any[]>([]);
+  const [acks, setAcks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [customText, setCustomText] = useState('');
@@ -87,8 +122,10 @@ export default function GameScreen() {
       setTurn(t);
       if (t?.completed_at) {
         fetchTurnRatings(t.id).then(setRatings).catch(() => {});
+        fetchTurnAcks(t.id).then(setAcks).catch(() => {});
       } else {
         setRatings([]);
+        setAcks([]);
       }
     } catch (e: any) {
       Alert.alert('Erreur', e.message);
@@ -149,6 +186,7 @@ export default function GameScreen() {
   const isPlaying = players.some((p) => p.user_id === myId);
   const isTarget = turn && turn.target_id === myId;
   const isPoser = turn && turn.poser_id === myId;
+  const hasAcked = acks.some((a) => a.user_id === myId);
 
   const handleJoin = async () => {
     if (!id) return;
@@ -163,7 +201,7 @@ export default function GameScreen() {
     }
   };
 
-  const handleAdvance = async () => {
+  const handleStartGame = async () => {
     if (!id) return;
     setBusy(true);
     try {
@@ -275,6 +313,19 @@ export default function GameScreen() {
     }
   };
 
+  const handleAckNext = async () => {
+    if (!turn) return;
+    setBusy(true);
+    try {
+      await ackTurn(turn.id);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleFinish = () => {
     if (!id) return;
     Alert.alert('Terminer la partie ?', undefined, [
@@ -340,7 +391,7 @@ export default function GameScreen() {
           ))}
           {!isPlaying && <Button label="Rejoindre" onPress={handleJoin} loading={busy} />}
           {isPlaying && (
-            <Button label="Commencer la partie" onPress={handleAdvance} loading={busy} disabled={players.length < 2} />
+            <Button label="Commencer la partie" onPress={handleStartGame} loading={busy} disabled={players.length < 2} />
           )}
           {players.length < 2 && <Text style={styles.hint}>Il faut au moins 2 joueurs pour commencer.</Text>}
         </View>
@@ -361,15 +412,44 @@ export default function GameScreen() {
                 </View>
               );
             })}
-            <Animated.View style={[styles.bottleWrap, rotateStyle]}>
-              <LinearGradient colors={brandGradient} style={styles.bottleNeck} />
-              <LinearGradient colors={brandGradient} style={styles.bottleBody} />
-            </Animated.View>
+
+            {!turn.completed_at && (
+              <Animated.View style={[styles.bottleWrap, rotateStyle]}>
+                <LinearGradient colors={brandGradient} style={styles.bottleNeck} />
+                <LinearGradient colors={brandGradient} style={styles.bottleBody} />
+              </Animated.View>
+            )}
+
+            {!spinning && turn.completed_at && (
+              <View style={[styles.revealOverlay, { borderColor: turn.choice === 'action' ? colors.red : colors.blue }]}>
+                <Text style={[styles.cardType, { color: turn.choice === 'action' ? colors.red : colors.blue }]}>
+                  {turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}
+                </Text>
+                <Text style={styles.revealQuestion} numberOfLines={3}>
+                  {revealedText}
+                </Text>
+                {turn.answer_text && (
+                  <Text style={styles.revealAnswer} numberOfLines={4}>
+                    {turn.answer_text}
+                  </Text>
+                )}
+                {turn.proof_url && <ProofViewer path={turn.proof_url} type={turn.proof_type} compact />}
+                {!isTarget && (
+                  <View style={styles.starsRowCompact}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Text key={n} style={styles.starCompact} onPress={() => handleRate(n)}>
+                        {myStars >= n ? '★' : '☆'}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
-          {spinning ? (
-            <Text style={styles.spinningText}>La bouteille tourne…</Text>
-          ) : (
+          {spinning && <Text style={styles.spinningText}>La bouteille tourne…</Text>}
+
+          {!spinning && !turn.completed_at && (
             <View style={styles.rolesRow}>
               <Text style={styles.roleText}>
                 Cible : <Text style={[styles.roleName, { color: colors.red }]}>{targetPlayer?.profiles?.display_name ?? '…'}</Text>
@@ -380,7 +460,7 @@ export default function GameScreen() {
             </View>
           )}
 
-          {!spinning && isTarget && !turn.choice && (
+          {!spinning && !turn.completed_at && isTarget && !turn.choice && (
             <View style={styles.choiceRow}>
               <View style={{ flex: 1 }}>
                 <Button label="Action" onPress={() => handleChoice('action')} loading={busy} variant="danger" />
@@ -392,11 +472,11 @@ export default function GameScreen() {
             </View>
           )}
 
-          {!spinning && !turn.choice && !isTarget && (
+          {!spinning && !turn.completed_at && !turn.choice && !isTarget && (
             <Text style={styles.hint}>En attente du choix Action/Vérité de {targetPlayer?.profiles?.display_name}…</Text>
           )}
 
-          {!spinning && isPoser && turn.choice && !revealedText && (
+          {!spinning && !turn.completed_at && isPoser && turn.choice && !revealedText && (
             <View style={{ marginTop: spacing.lg, width: '100%' }}>
               <Text style={styles.subtitle}>
                 Pas de question dans la banque pour l'instant — écris-en une pour {targetPlayer?.profiles?.display_name} :
@@ -406,18 +486,18 @@ export default function GameScreen() {
             </View>
           )}
 
-          {!spinning && !isPoser && turn.choice && !revealedText && (
+          {!spinning && !turn.completed_at && !isPoser && turn.choice && !revealedText && (
             <Text style={styles.hint}>En attente que {poserPlayer?.profiles?.display_name} écrive sa question…</Text>
           )}
 
-          {!spinning && revealedText && (
+          {!spinning && !turn.completed_at && revealedText && (
             <View style={[styles.card, { borderColor: turn.choice === 'action' ? colors.red : colors.blue }]}>
               <Text style={[styles.cardType, { color: turn.choice === 'action' ? colors.red : colors.blue }]}>
                 {turn.choice === 'action' ? 'ACTION' : 'VÉRITÉ'}
               </Text>
               <Text style={styles.cardText}>{revealedText}</Text>
 
-              {isPoser && !turn.completed_at && (
+              {isPoser && (
                 <View style={styles.poserControls}>
                   <Pressable style={styles.checkboxRow} onPress={() => handleToggleRequireProof(!turn.proof_required)}>
                     <View style={[styles.checkbox, turn.proof_required && styles.checkboxChecked]} />
@@ -431,7 +511,7 @@ export default function GameScreen() {
                 </View>
               )}
 
-              {isTarget && !turn.completed_at && (
+              {isTarget && (
                 <View style={{ marginTop: spacing.md }}>
                   {turn.choice === 'verite' && (
                     <TextField placeholder="Ta réponse" value={answerText} onChangeText={setAnswerText} multiline />
@@ -452,50 +532,29 @@ export default function GameScreen() {
                 </View>
               )}
 
-              {!isTarget && !isPoser && !turn.completed_at && (
-                <Text style={styles.hint}>En attente de {targetPlayer?.profiles?.display_name}…</Text>
-              )}
-              {isPoser && !isTarget && !turn.completed_at && (
+              {!isTarget && !isPoser && <Text style={styles.hint}>En attente de {targetPlayer?.profiles?.display_name}…</Text>}
+              {isPoser && !isTarget && (
                 <Text style={styles.hint}>En attente de la réponse de {targetPlayer?.profiles?.display_name}…</Text>
-              )}
-
-              {turn.completed_at && (
-                <View style={{ marginTop: spacing.md }}>
-                  {turn.answer_text && (
-                    <>
-                      <Text style={styles.answerLabel}>Réponse :</Text>
-                      <Text style={styles.answerTextStyle}>{turn.answer_text}</Text>
-                    </>
-                  )}
-                  {turn.proof_url && (
-                    <View style={{ marginTop: spacing.sm }}>
-                      <ProofViewer path={turn.proof_url} type={turn.proof_type} />
-                    </View>
-                  )}
-
-                  {!isTarget && (
-                    <View style={styles.ratingRow}>
-                      <Text style={styles.ratingLabel}>Note la prestation :</Text>
-                      <View style={{ flexDirection: 'row' }}>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <Text key={n} style={styles.star} onPress={() => handleRate(n)}>
-                            {myStars >= n ? '★' : '☆'}
-                          </Text>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                  {avgStars !== null && (
-                    <Text style={styles.avgRating}>
-                      Moyenne : {avgStars.toFixed(1)} / 5 ({ratings.length} vote{ratings.length > 1 ? 's' : ''})
-                    </Text>
-                  )}
-                </View>
               )}
             </View>
           )}
 
-          {!spinning && turn.completed_at && <Button label="Tour suivant" onPress={handleAdvance} loading={busy} />}
+          {!spinning && turn.completed_at && (
+            <View style={{ width: '100%', marginTop: spacing.md, alignItems: 'center' }}>
+              {avgStars !== null && (
+                <Text style={styles.avgRating}>
+                  Moyenne : {avgStars.toFixed(1)} / 5 ({ratings.length} vote{ratings.length > 1 ? 's' : ''})
+                </Text>
+              )}
+              {hasAcked ? (
+                <Text style={styles.hint}>
+                  En attente des autres… ({acks.length}/{players.length})
+                </Text>
+              ) : (
+                <Button label={`Suivant (${acks.length}/${players.length})`} onPress={handleAckNext} loading={busy} />
+              )}
+            </View>
+          )}
 
           <View style={{ height: spacing.md }} />
           <Button label="Terminer la partie" onPress={handleFinish} variant="secondary" loading={busy} />
@@ -551,15 +610,41 @@ const styles = StyleSheet.create({
   rerollLink: { color: colors.blue, fontSize: 13, fontWeight: '600' },
   proofLabel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm, marginBottom: spacing.sm },
   proofPicked: { color: colors.text, fontSize: 13, marginBottom: spacing.sm },
+  // Aperçu révélé au centre du cercle, à la place de la bouteille, tant que
+  // tout le monde n'a pas appuyé sur "Suivant".
+  revealOverlay: {
+    position: 'absolute',
+    left: (WHEEL_SIZE - REVEAL_SIZE) / 2,
+    top: (WHEEL_SIZE - REVEAL_SIZE) / 2,
+    width: REVEAL_SIZE,
+    height: REVEAL_SIZE,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revealQuestion: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  revealAnswer: { color: colors.textMuted, fontSize: 11, textAlign: 'center', marginTop: spacing.xs },
+  starsRowCompact: { flexDirection: 'row', marginTop: spacing.xs },
+  starCompact: { fontSize: 16, color: colors.gold, marginHorizontal: 1 },
   answerLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginBottom: spacing.xs },
   answerTextStyle: { color: colors.text, fontSize: 16 },
-  imagePlaceholder: { width: 200, height: 200, borderRadius: radius.md, backgroundColor: colors.surfaceElevated },
-  proofImage: { width: 200, height: 200, borderRadius: radius.md },
-  videoLink: { color: colors.blue, fontSize: 14, fontWeight: '700' },
+  imagePlaceholder: { width: 120, height: 120, borderRadius: radius.md, backgroundColor: colors.surfaceElevated },
+  imagePlaceholderCompact: { width: 70, height: 70 },
+  proofImage: { width: 120, height: 120, borderRadius: radius.md },
+  proofImageCompact: { width: 70, height: 70 },
+  videoBox: { width: 120, height: 120, borderRadius: radius.md, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
+  videoBoxCompact: { width: 70, height: 70 },
+  videoPlayIcon: { color: colors.blue, fontSize: 28 },
+  downloadRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, gap: 4 },
+  downloadIcon: { color: colors.blue, fontSize: 14, fontWeight: '800' },
+  downloadLabel: { color: colors.blue, fontSize: 11, fontWeight: '700' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
   ratingLabel: { color: colors.textMuted, fontSize: 13 },
-  star: { fontSize: 24, color: colors.red, marginLeft: 2 },
-  avgRating: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm },
+  star: { fontSize: 24, color: colors.gold, marginLeft: 2 },
+  avgRating: { color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm },
   finishedContainer: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, alignItems: 'center', justifyContent: 'center' },
   finishedEmoji: { fontSize: 48, marginBottom: spacing.md },
   finishedTitle: { color: colors.text, fontSize: 26, fontWeight: '800', marginBottom: spacing.xs },
