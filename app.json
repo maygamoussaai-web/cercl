@@ -13,13 +13,22 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.cercl.app"
+      "bundleIdentifier": "com.cercl.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "CERCL a besoin d'accéder à tes photos pour changer une photo de profil/Cercle ou joindre une preuve.",
+        "NSPhotoLibraryAddUsageDescription": "CERCL a besoin d'enregistrer les preuves téléchargées dans tes photos."
+      }
     },
     "android": {
       "package": "com.cercl.app",
       "adaptiveIcon": {
         "backgroundColor": "#0B0B10"
-      }
+      },
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -29,6 +38,25 @@
           "android": {
             "kotlinVersion": "1.9.25"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CERCL a besoin d'accéder à tes photos pour changer une photo de profil/Cercle ou joindre une preuve."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2F5CFF"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "CERCL a besoin d'accéder à tes photos pour enregistrer les preuves téléchargées.",
+          "savePhotosPermission": "CERCL a besoin d'enregistrer les preuves téléchargées dans tes photos."
         }
       ]
     ],
