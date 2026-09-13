@@ -15,15 +15,29 @@ export default function SignUpScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSignUp = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email manquant', 'Entre ton adresse email.');
+      return;
+    }
     if (password.length < 6) {
       Alert.alert('Mot de passe trop court', 'Utilise au moins 6 caractères.');
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     setLoading(false);
     if (error) {
       Alert.alert('Inscription impossible', error.message);
+      return;
+    }
+    // Si la confirmation par email est activée côté Supabase (réglage par défaut),
+    // signUp ne crée pas de session immédiatement : sans ce message, l'app ne
+    // donnait aucun retour et donnait l'impression que rien ne s'était passé.
+    if (!data.session) {
+      Alert.alert(
+        'Vérifie tes emails',
+        "Un email de confirmation vient d'être envoyé à cette adresse. Ouvre-le, confirme, puis reviens te connecter ici."
+      );
     }
   };
 
