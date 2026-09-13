@@ -6,6 +6,9 @@
  * couleur "primaire" (actions principales, liens, Vérité), le rouge la couleur
  * "forte" (danger/destructif, Action). Pas d'autre teinte dans l'app.
  *
+ * Exception explicitement demandée : `gold` pour les étoiles de notation
+ * (plus lisible/conventionnel qu'une étoile rouge ou bleue).
+ *
  * `accent` et `danger` sont conservés comme alias de `blue`/`red` pour ne pas
  * casser tous les écrans existants qui les référencent déjà.
  */
@@ -17,6 +20,7 @@ export const colors = {
 
   blue: '#2F5CFF',
   red: '#FF3B3B',
+  gold: '#FFC93C',
 
   accent: '#2F5CFF', // alias = blue
   danger: '#FF3B3B', // alias = red
