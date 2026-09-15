@@ -1,19 +1,244 @@
-- philosophie Ponytail active depuis le 2026-09-14 (voir note finale) -
+# Journal des décisions — CERCL
 
-### 2026-09-14 — Icônes de navigation
-- **CONSTAT** : icônes ajoutées aux 4 onglets via `@expo/vector-icons` (Ionicons),
-  déjà inclus dans Expo — aucune dépendance ajoutée.
+Chaque entrée est classée : **EXIGENCE** (déjà décidé dans le cahier des charges),
+**CONTRAINTE TECHNIQUE** (nécessité liée à la sécurité/plateformes/Supabase/architecture),
+ou **PROPOSITION** (recommandation de Claude, non validée tant que ce n'est pas indiqué).
 
-### 2026-09-15 — Bug critique corrigé : récursion infinie RLS sur circle_members
-- **BUG CORRIGÉ (bloquant, signalé par le propriétaire du projet avec capture d'écran)** :
-  créer un Cercle échouait avec "infinite recursion detected in policy for relation
-  circle_members" dès que l'app tentait de lire la liste des membres. Cause : les policies
-  `circle_members_select` et `conversation_members_select` se référençaient elles-mêmes
-  (sous-requête sur leur propre table dans leur clause USING), ce que Postgres ne supporte
-  pas — un classique piège RLS. Corrigé en passant par deux fonctions `SECURITY DEFINER`
-  (`is_circle_member`, `is_conversation_member`) qui contournent RLS en interne au lieu de
-  la sous-requête directe. Audit complet de toutes les policies de toutes les tables
-  effectué après coup : aucune autre occurrence de ce problème.
+---
+
+### 2026-09-08 — Stack applicatif
+- **EXIGENCE** : TypeScript, React Native, Expo, Supabase, PostgreSQL, Supabase Auth,
+  Supabase Realtime, GitHub (cahier des charges §4).
+- **CONTRAINTE TECHNIQUE** : Lovable génère du React web (React DOM), pas du React
+  Native/Expo. Il ne peut pas produire une app native store-ready sans passer par un
+  wrapper webview (Capacitor), ce qui contredit l'exigence "app native publiable sur les
+  stores, pas un site ni une PWA". Décision : l'app est développée directement en
+  Expo/React Native/TypeScript dans ce repository, sans passer par Lovable. Lovable reste
+  disponible plus tard pour un usage annexe et optionnel (ex. page web d'aperçu
+  d'invitation `cercl.app/join/XXXXXXXX`, qui est légitimement une page web selon le
+  cahier des charges §11) — non implémenté à ce stade.
+
+### 2026-09-08 — Supabase
+- **CONSTAT** : projet Supabase `bwlwcmcybqyxwtqluddx` (eu-west-1, Postgres 17.6) existant,
+  vide (aucune table, aucune fonction, extensions par défaut uniquement). Sain, prêt à
+  recevoir un schéma.
+- **CONTRAINTE TECHNIQUE** : aucune table n'a été créée à ce stade. Le schéma proposé dans
+  le rapport d'initialisation est une base de réflexion, pas une implémentation validée.
+
+### 2026-09-08 — Scaffold initial du repo
+- **PROPOSITION** : navigation à 4 onglets (Cercles / Amis / Notifs / Profil) dans
+  `app/(tabs)/`. Le cahier des charges (§36) indique explicitement que la structure exacte
+  des 4 pages principales doit être validée avant implémentation définitive — cette
+  structure est donc un placeholder de départ, pas une décision finale.
+- **PROPOSITION** : identifiants d'app `com.cercl.app` (iOS `bundleIdentifier` / Android
+  `package`) dans `app.json`. À remplacer par les vrais identifiants une fois les comptes
+  développeur Apple Developer Program et Google Play Console créés.
+
+### 2026-09-08 — Environnement de développement sans ordinateur
+- **CONTRAINTE (contexte projet)** : le propriétaire du projet n'a pas d'ordinateur. Le
+  workflow standard Expo (`npx expo start` + Expo Go) nécessite un ordinateur faisant tourner
+  le serveur de développement et est donc écarté comme méthode principale.
+- **PROPOSITION** : utiliser EAS Build (service cloud Expo) pour construire un `.apk`
+  Android installable directement, déclenché automatiquement à chaque push via GitHub
+  Actions (`.github/workflows/eas-build-preview.yml`). Voir `docs/BUILD_SANS_ORDINATEUR.md`
+  pour la configuration (compte Expo + secret GitHub `EXPO_TOKEN`, à faire une seule fois).
+  Limite connue : ne couvre que l'installation Android pour l'instant ; iOS nécessitera un
+  compte Apple Developer et une distribution TestFlight, à traiter plus tard.
+
+### 2026-09-08/09 — Build EAS : erreurs corrigées
+- **CONSTAT/CORRECTION** : `@supabase/supabase-js` a retiré le support de Node 20 à partir
+  de la version 2.110.0. Corrigé en fixant la dépendance exactement à `2.109.0` (dernière
+  version compatible Node 20), sans avoir besoin de forcer une version Node précise dans
+  `eas.json` (retour à la version par défaut d'EAS, plus prévisible qu'un override manuel).
+
+### 2026-09-08 — Schéma Supabase complet (Social Core + Game Platform)
+- **CONSTAT** : migrations `social_core` et `game_platform` appliquées. Tables, RLS,
+  triggers et fonctions RPC créés — détail dans `docs/DATABASE.md`.
+- **CONTRAINTE TECHNIQUE (corrigée)** : les `GRANT EXECUTE` explicites sur les fonctions
+  RPC ne suffisent pas seuls — Postgres accorde `EXECUTE` à `PUBLIC` par défaut sur toute
+  nouvelle fonction. Corrigé par une migration dédiée qui révoque l'accès par défaut puis
+  ne l'accorde qu'au strict nécessaire. Vérifié via `get_advisors`.
+- **CONTRAINTE TECHNIQUE (à vérifier)** : Supabase Auth peut exiger une confirmation par
+  email avant de créer une session. Si l'inscription ne connecte pas automatiquement,
+  vérifier Authentication → Providers → Email → "Confirm email" dans le dashboard.
+
+### 2026-09-09 — Écran de jeu Action ou Vérité (lobby, tours, choix)
+- **CONSTAT** : lobby, affichage cible/poseur, choix Action/Vérité par la cible,
+  révélation du contenu ou question personnalisée, tour suivant. Synchronisé en temps réel
+  (`games`, `game_turns`, `game_players` ajoutées à la publication `supabase_realtime`).
+  Le bouton "Lancer une partie" devient "Rejoindre la partie" s'il y en a déjà une (§18).
+- **CONSTAT** : la banque `game_content` étant vide, tous les tours passent par la
+  question personnalisée — normal tant que la banque de 500+500 propositions n'est pas
+  fournie (§19).
+
+### 2026-09-09 — Ordre des poseurs (alphabétique)
+- **CORRECTION (précision du propriétaire du projet)** : l'ordre des poseurs suit l'ordre
+  **alphabétique du @identifiant**, pas l'ordre d'arrivée. `advance_turn` trie par
+  `profiles.handle`. `circle_members.order_index` n'est plus utilisé par la logique de jeu
+  (colonne conservée, inoffensive).
+
+### 2026-09-09 — Chat, avatars, premières améliorations visuelles
+- **CONSTAT** : chat de Cercle et chat privé, temps réel (`messages` ajoutée à la
+  publication `supabase_realtime`). Composant `Avatar` réutilisable partout. Cartes avec
+  ombre, bouteille redessinée, listes triées alphabétiquement.
+
+### 2026-09-11 — Authentification par téléphone (remplacée depuis, voir 2026-09-12)
+- Décision intermédiaire abandonnée : voir l'entrée du 2026-09-12 pour l'état actuel.
+
+### 2026-09-11 — Correction : c'est le poseur qui écrit la question personnalisée
+- **CORRECTION (précision du propriétaire du projet)** : c'est le **poseur**, pas la
+  cible, qui écrit la question personnalisée quand la banque est vide (§31 — le texte du
+  cahier des charges était ambigu sur ce point, l'ambiguïté est maintenant tranchée).
+
+### 2026-09-11 — Social Core complété (présence, réglages de Cercle, retirer un ami)
+- Présence en ligne par Cercle (Supabase Realtime Presence). Renommer/quitter un
+  Cercle/retirer un membre (règles déjà en RLS, interface ajoutée). Retirer un ami. Les
+  notifications ouvrent l'écran concerné au clic (§33).
+
+### 2026-09-11 — Capacités du créateur complétées + bouteille animée (première version)
+- Ajouter un membre directement depuis ses amis, gérer/révoquer les invitations (§9).
+- Bouteille animée : joueurs disposés en cercle, la bouteille tourne puis s'arrête sur la
+  cible réellement tirée côté serveur (§23) — jamais recalculée côté client. Un tour déjà
+  ancien (réouverture de l'écran) place la bouteille sans rejouer l'animation (heuristique :
+  moins de 8s depuis la création du tour).
+
+### 2026-09-11 — Photos, blocage, transfert de propriété, chat avancé, push
+- **Stockage** : buckets `avatars`/`circle-images` (publics), `chat-media` (privé, RLS par
+  membre de conversation). Upload réel de photo de profil et d'image de Cercle.
+- **Blocage (§21)** : table `blocked_users` + RPC `block_user`/`unblock_user` — supprime
+  l'amitié, décline les demandes en attente, empêche nouvelles demandes/messages entre les
+  deux comptes. Écran "Utilisateurs bloqués".
+- **Transfert de propriété de Cercle** : RPC `transfer_circle_ownership`, permet ensuite au
+  créateur de quitter son Cercle.
+- **Chat avancé** : suppression de ses messages, envoi de photos (URL signée résolue à
+  l'affichage), indicateur "Quelqu'un écrit…" (Realtime broadcast, pas d'écriture en base).
+- **Nettoyage automatique (§16)** : `pg_cron`, suppression quotidienne des messages de plus
+  de 30 jours.
+- **Notifications push** : `pg_net` activé, trigger sur `notifications` appelant l'API push
+  Expo directement (pas d'Edge Function). Token enregistré à la connexion
+  (`expo-notifications`/`expo-device`). Nécessite un vrai appareil + build EAS pour tester.
+- **Limite acceptée** : `pg_net` s'installe dans le schéma `public` sans possibilité de le
+  déplacer (limitation connue de l'extension chez Supabase) — sévérité faible, accepté.
+- **Non fait (dépendance externe hors de portée, pas un oubli)** : vrais liens web
+  `cercl.app/join/xxx` cliquables depuis l'extérieur — nécessite un domaine réel, une page
+  hébergée et les identifiants Apple/Google, mis de côté par le propriétaire du projet.
+
+### 2026-09-12 — Authentification : téléphone → email + Google
+- **EXIGENCE (décision du propriétaire du projet)** : email + mot de passe et Google,
+  remplaçant le téléphone/SMS. Deuxième changement de méthode d'authentification en une
+  semaine — vigilance recommandée avant un nouveau changement.
+- **PROPOSITION** : mot de passe classique plutôt que lien magique (plus simple, pas de
+  deep-linking supplémentaire à gérer). À signaler si un lien magique est préféré.
+- **CONSTAT — Google OAuth** : flux web standard de Supabase (navigateur système via
+  `expo-web-browser`, tokens récupérés depuis l'URL de retour puis posés avec
+  `setSession`) plutôt qu'un SDK natif Google Sign-In (plus simple à mettre en place,
+  fonctionne pareil sur Android et iOS).
+- **CONTRAINTE TECHNIQUE (bloquante, pas encore levée)** : client OAuth Google à créer sur
+  Google Cloud Console (compte propre au propriétaire du projet), à renseigner dans
+  Supabase, et `cercl://` à autoriser comme Redirect URL. Étapes : `docs/AUTH_GOOGLE_SETUP.md`.
+
+### 2026-09-12 — Identité visuelle définitive : bleu + rouge (+ noir/blanc)
+- **EXIGENCE (décision du propriétaire du projet, remplace le placeholder violet)** :
+  les couleurs de marque de CERCL sont désormais **le bleu** (`#2F5CFF`) et **le rouge**
+  (`#FF3B3B`), le reste de l'interface restant en noir/blanc/gris (fond quasi noir, texte
+  blanc cassé, bordures grises). Ce n'est plus un placeholder : c'est la palette adoptée.
+  `colors.accent`/`colors.danger` restent comme alias de `blue`/`red` dans le code pour ne
+  pas casser les écrans déjà écrits — toute l'app en hérite automatiquement.
+- **PROPOSITION — usage fonctionnel des deux couleurs** : bleu = action principale/lien
+  (bouton "primary", Vérité, poseur, présence en ligne) ; rouge = destructif/attention
+  (retirer, bloquer, quitter, Action, cible désignée par la bouteille). Un dégradé
+  bleu→rouge (`brandGradient`) est utilisé sur le bouton principal de toute l'app et sur
+  la bouteille du jeu, comme signature visuelle qui réunit les deux couleurs plutôt que de
+  les juxtaposer platement. Ajout de la dépendance `expo-linear-gradient` (module Expo
+  standard, faible risque).
+- **CONSTAT — palette avatar/présence retravaillée** : l'ancienne palette d'avatars
+  (violet/vert/orange/cyan/rose) est remplacée par des nuances de bleu et de rouge
+  uniquement. Le point de présence en ligne, auparavant vert, est maintenant bleu (plus de
+  vert dans l'app, conformément à la consigne des deux couleurs strictes).
+- **NON FAIT (report délibéré)** : les icônes/splash de l'app restent le placeholder
+  générique posé en tout début de projet (non committé, cf. `assets/README.md`), pas
+  encore mis à jour avec les vraies couleurs de marque — une régénération rapide serait
+  possible si souhaitée, mais n'était pas dans le périmètre explicite de cette étape.
+
+### 2026-09-12 — Trous du jeu comblés : fin de partie, mode, classement
+- **CONSTAT — fin de partie** : nouveau statut `finished` réellement atteignable via la
+  fonction RPC `finish_game` (bouton "Terminer la partie", visible à tout joueur pendant une
+  partie en cours — **PROPOSITION**, le cahier des charges ne précise pas qui peut terminer
+  une partie, à confirmer si ça doit être réservé à quelqu'un en particulier). Écran de fin
+  simple ("Partie terminée 🎉") avec retour au Cercle.
+- **CONSTAT — correction d'un oubli** : `started_at` n'était en fait jamais renseigné sur une
+  partie (oublié lors de la première implémentation d'`advance_turn`), ce qui aurait faussé
+  tout calcul de durée. Corrigé : renseigné au premier tour de la partie.
+- **CONSTAT — classement (§32)** : `circles.total_play_seconds` cumule la durée à chaque
+  partie terminée (calculé côté serveur dans `finish_game`, jamais côté client). Nouvel
+  écran `/leaderboard` accessible depuis la liste des Cercles, trié par temps de jeu cumulé
+  décroissant. Pas encore de découpage par période (jour/semaine/mois, mentionné comme
+  possible au §32) — seul le cumul total est affiché pour l'instant.
+- **CONSTAT — choix du mode** : sélecteur de mode (Chill / Entre nous / Ambiance / Chaos /
+  Couple) ajouté dans l'écran du Cercle avant de lancer une partie, transmis à `create_game`.
+  Le champ existait déjà en base sans interface pour le choisir.
+- **RESTE CONNU** : `advance_turn` (logique de tours) toujours non testé avec plusieurs
+  vrais comptes simultanés — c'est un premier jet fonctionnel, pas une logique validée en
+  conditions réelles (§17 du cahier des charges demande explicitement des tests sur les
+  règles critiques).
+
+### 2026-09-12 — Réponse Vérité, preuve Action, exigence de preuve, rejeu de question, notation 5 étoiles
+- **EXIGENCE (précisions apportées par le propriétaire du projet)** :
+  - Vérité : la cible doit obligatoirement taper sa réponse (texte) pour que le tour soit
+    considéré terminé — pas seulement lire la question.
+  - Action : la preuve prend la forme d'une photo ou d'une vidéo.
+  - Le poseur peut cocher "Exiger une preuve", même sur une question venant de la banque.
+    Si coché, la cible a l'obligation d'ajouter une preuve (photo ou vidéo) avant de
+    pouvoir valider. Si non coché, la cible peut choisir d'en ajouter une ou non.
+  - Le poseur dispose d'un bouton "Changer la question" pour obtenir une autre proposition
+    de la banque (uniquement quand le contenu vient de la banque, pas sur une question
+    personnalisée).
+  - Notation 5 étoiles de la cible par les autres joueurs, une fois le tour terminé.
+- **CONSTAT — implémentation** : `game_turns` étendue (`answer_text`, `proof_required`,
+  `proof_url`, `proof_type`). Nouvelle table `game_turn_ratings` (une note par joueur et
+  par tour, mise à jour possible). Nouveau bucket Storage privé `game-proofs` (accès
+  restreint aux joueurs de la partie concernée). Toutes les écritures passent par des RPC
+  dédiées (`submit_turn_response`, `set_proof_required`, `reroll_turn_content`) qui
+  valident les règles côté serveur.
+- **PROPOSITION — qui peut noter** : "les autres" interprété comme tous les joueurs sauf la
+  cible (poseur inclus), à confirmer si ça doit être plus restreint.
+
+### 2026-09-13 — Correction création de compte, étoiles dorées, réponse/preuve au centre du cercle, téléchargement
+- **BUG CORRIGÉ (signalé par le propriétaire du projet comme prioritaire)** : la création
+  de compte semblait ne pas fonctionner. Cause réelle : Supabase exige une confirmation
+  par email par défaut ; `signUp` réussissait bel et bien, mais l'app n'affichait aucun
+  retour dans ce cas (aucune session créée, aucun message), donnant l'impression que rien
+  ne s'était passé. Corrigé : un message "Vérifie tes emails" s'affiche désormais quand
+  aucune session n'est retournée. Rappel : "Confirm email" peut être désactivé dans le
+  dashboard Supabase (Authentication → Providers → Email) pour un test immédiat sans email.
+- **CORRECTION (précision du propriétaire du projet)** : les étoiles de notation sont
+  **dorées** (`colors.gold`, `#FFC93C`), pas rouges comme précédemment choisi par défaut —
+  exception explicitement voulue à la règle des deux couleurs strictes.
+- **EXIGENCE (précision du déroulé du jeu)** : une fois la cible soumise (réponse Vérité ou
+  preuve Action), le résultat s'affiche **au centre du cercle** (à la place de la
+  bouteille) — question, réponse/preuve, et étoiles de notation — et y reste visible tant
+  que tous les joueurs n'ont pas appuyé sur "Suivant". Une fois que TOUS l'ont fait
+  (pas juste un seul comme avant), le tour est supprimé de la base de données et un
+  nouveau tour est généré, ce qui relance la bouteille pour tout le monde en même temps.
+  Implémenté via une nouvelle table `game_turn_acks` (un acquittement par joueur et par
+  tour) et une fonction RPC `ack_turn_and_advance` qui supprime le tour et enchaîne
+  automatiquement sur `advance_turn` une fois que le compte d'acquittements atteint le
+  nombre de joueurs. Le bouton "Suivant" affiche maintenant un compteur (ex. "Suivant
+  (2/4)"), et se transforme en "En attente des autres…" une fois qu'on a soi-même validé.
+- **CONSTAT — téléchargement des preuves** : icône ⬇ sous chaque photo/vidéo de preuve,
+  qui télécharge le fichier et l'enregistre directement dans la galerie du téléphone
+  (`expo-file-system` + `expo-media-library`, nouvelles dépendances). Nécessite la
+  permission d'accès aux photos, déjà configurée dans `app.json`.
+- **LIMITE CONNUE (non traitée)** : la ligne de la base de données est bien supprimée, mais
+  le fichier de preuve (photo/vidéo) reste dans le bucket Storage `game-proofs` (fichier
+  orphelin) — supprimer aussi le fichier demanderait un appel à l'API Storage depuis la
+  fonction serveur, plus complexe à faire de façon fiable ; un nettoyage périodique des
+  fichiers orphelins (sur le modèle du nettoyage des messages) pourrait être ajouté plus
+  tard si le volume de stockage devient un sujet.
+- **CONSTAT — app.json** : la configuration des plugins (permissions photos/notifications)
+  avait disparu du fichier entre deux étapes précédentes (raison inconnue — pas une action
+  volontaire de ma part) ; restaurée et complétée avec la permission d'écriture nécessaire
+  au téléchargement.
 
 ### 2026-09-14 — Philosophie "Ponytail" adoptée pour tout le développement
 - **EXIGENCE (règle de travail imposée par le propriétaire du projet, s'applique à toute
@@ -23,5 +248,22 @@
   éviter sur-ingénierie, abstractions inutiles, fichiers superflus ; toujours chercher une
   librairie de composants adaptée avant de coder un équivalent à la main ; ne jamais
   sacrifier sécurité, robustesse ou accessibilité. Enregistré dans la mémoire persistante
-  de Claude (pas seulement ce document) pour s'appliquer à toutes les conversations futures
-  sur ce projet.
+  de Claude (pas seulement ce document) pour s'appliquer à toutes les conversations
+  futures sur ce projet.
+
+### 2026-09-14 — Icônes de navigation
+- **CONSTAT** : icônes ajoutées aux 4 onglets via `@expo/vector-icons` (Ionicons), déjà
+  inclus dans Expo — aucune dépendance ajoutée, conformément à la philosophie Ponytail.
+
+### 2026-09-15 — Bug critique corrigé : récursion infinie RLS sur circle_members
+- **BUG CORRIGÉ (bloquant, signalé par le propriétaire du projet avec capture d'écran —
+  empêchait de fait toute utilisation de l'app dès la création d'un Cercle)** : créer un
+  Cercle échouait avec "infinite recursion detected in policy for relation
+  circle_members" dès que l'app tentait de lire la liste des membres juste après. Cause :
+  les policies `circle_members_select` et `conversation_members_select` se référençaient
+  elles-mêmes (sous-requête sur leur propre table dans leur clause USING), ce que Postgres
+  ne supporte pas — un classique piège RLS. Corrigé en passant par deux fonctions
+  `SECURITY DEFINER` (`is_circle_member`, `is_conversation_member`) qui contournent RLS en
+  interne au lieu de la sous-requête directe sur la même table. Audit complet de toutes
+  les policies de toutes les tables effectué après coup (requête directe sur
+  `pg_policies`) : aucune autre occurrence de ce problème dans le reste du schéma.
